@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tween test 3: Vertex morph</title>
+  <script>window.MURMUR_TWEEN_MODE = 3;</script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0c0c0e; min-height: 100vh; overflow: hidden; font-family: system-ui, sans-serif; }
+    main { position: relative; }
+
+    #tween-banner {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+      padding: 8px 16px; background: rgba(60, 100, 80, 0.9); color: #ddd; font-size: 12px;
+      text-align: center; pointer-events: none;
+    }
+
+    #attractor-ui {
+      position: fixed; top: 40px; left: 16px; z-index: 10;
+      display: flex; flex-direction: column; gap: 8px;
+      max-height: calc(100vh - 48px); overflow-y: auto;
+      width: 220px;
+    }
+    #attractor-ui.hidden { display: none; }
+
+    .attractor-panel {
+      flex-shrink: 0;
+      width: 220px; padding: 0;
+      background: rgba(12, 12, 14, 0.92); border: 1px solid #2a2a2e;
+      border-radius: 10px; color: #ccc; font-size: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    }
+    .attractor-panel .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px; cursor: pointer; user-select: none;
+      border-bottom: 1px solid #252528;
+    }
+    .attractor-panel.minimized .panel-header { border-bottom: none; }
+    .attractor-panel .panel-header .title { font-size: 11px; font-weight: 600; color: #aaa; }
+    .attractor-panel .panel-header-btns { display: flex; align-items: center; gap: 4px; }
+    .attractor-panel .panel-header .minimize-btn,
+    .attractor-panel .panel-header .remove-btn {
+      width: 20px; height: 20px; border: none; background: transparent; color: #666;
+      cursor: pointer; font-size: 14px; line-height: 1; padding: 0;
+    }
+    .attractor-panel .panel-header .minimize-btn { font-size: 10px; }
+    .attractor-panel .panel-header .minimize-btn:hover,
+    .attractor-panel .panel-header .remove-btn:hover { color: #aaa; }
+    .attractor-panel .panel-header .remove-btn:hover { color: #c66; }
+    .attractor-panel.selected { border-color: #6b8ab0; box-shadow: 0 0 0 1px #6b8ab0; }
+    .attractor-panel.minimized .panel-body { display: none; }
+
+    .panel-body { padding: 12px 14px; }
+    .panel-section { margin-bottom: 12px; }
+    .panel-section:last-child { margin-bottom: 0; }
+    .panel-section-title {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+      color: #666; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #252528;
+    }
+    .panel-body label { display: flex; align-items: center; gap: 6px; }
+    .panel-body select {
+      width: 100%; background: #1a1a1e; color: #e0e0e0; border: 1px solid #333;
+      padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;
+    }
+    .panel-body select:hover { border-color: #555; }
+    .slider-row {
+      display: flex; align-items: center; gap: 8px; margin-top: 6px;
+    }
+    .slider-row label { flex: 0 0 72px; font-size: 11px; color: #999; }
+    .slider-row .value { min-width: 28px; color: #888; font-size: 11px; text-align: right; }
+    .panel-body input[type="range"] {
+      flex: 1; min-width: 0; height: 5px;
+      background: #252528; border-radius: 3px; accent-color: #6b8ab0;
+      -webkit-appearance: none; appearance: none;
+    }
+    .panel-body input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 10px; border-radius: 50%; background: #7a9aba; cursor: pointer; }
+    .panel-body input[type="range"]::-moz-range-thumb { width: 10px; height: 10px; border-radius: 50%; background: #7a9aba; cursor: pointer; border: none; }
+    .toggle-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; cursor: pointer; font-size: 11px; color: #999; }
+    .toggle-row input[type="checkbox"] { width: 14px; height: 14px; accent-color: #6b8ab0; cursor: pointer; }
+    .video-map-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+    .video-map-row .video-label { flex: 0 0 72px; font-size: 11px; color: #999; }
+    .video-map-row .video-file-input { flex: 1; min-width: 0; font-size: 10px; color: #888; }
+    .video-map-row .video-clear-btn { padding: 4px 8px; font-size: 10px; background: #252528; color: #888; border: 1px solid #333; border-radius: 4px; cursor: pointer; }
+    .video-map-row .video-clear-btn:hover { color: #c66; border-color: #555; }
+
+    .attractor-panel .lorenz-only { display: none; }
+    .attractor-panel .rossler-only { display: none; }
+    .attractor-panel .murmuration-only { display: none; }
+    .attractor-panel.rossler .lorenz-only { display: none; }
+    .attractor-panel.rossler .rossler-only { display: block; }
+    .attractor-panel.murmuration .lorenz-only { display: none; }
+    .attractor-panel.murmuration .rossler-only { display: none; }
+    .attractor-panel.murmuration .murmuration-only { display: block; }
+
+    #hint {
+      position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+      color: #444; font-size: 11px; z-index: 10;
+      transition: opacity 1s ease;
+    }
+    .add-attractor-btn {
+      flex-shrink: 0;
+      width: 220px; padding: 10px 14px;
+      margin-top: 4px;
+      background: rgba(26, 26, 30, 0.92); border: 1px dashed #3a3a40;
+      border-radius: 8px; color: #888; font-size: 12px;
+      cursor: pointer; transition: color 0.15s, border-color 0.15s;
+    }
+    .add-attractor-btn:hover { color: #6b8ab0; border-color: #6b8ab0; }
+
+    #hint.hint-faded { opacity: 0; pointer-events: none; }
+    .hidden-when-tween { display: none !important; }
+  </style>
+</head>
+<body>
+  <div id="tween-banner">Tween test 3: Vertex morph</div>
+  <main></main>
+  <div id="attractor-ui">
+    <button type="button" class="add-attractor-btn" id="add-attractor-btn">+ Add attractor</button>
+  </div>
+  <div id="hint">+ Add attractor · Select Murmuration · Use tween From/To and Run tween</div>
+  <script src="attractor.js"></script>
+</body>
+</html>

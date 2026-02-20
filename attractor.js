@@ -44,6 +44,122 @@ const MURMUR_CONNECT_RADIUS = 0.45;
 const MURMUR_TORUS_MINOR = 0.4;
 const PAN_SPEED = 0.5;
 
+const MURMUR_TWEEN_MODE = typeof window !== 'undefined' ? window.MURMUR_TWEEN_MODE : undefined;
+const MURMUR_TWEEN_SHAPES = ['box', 'sphere', 'ellipsoid', 'cylinder', 'cone', 'torus', 'pyramid', 'dome', 'tetrahedron', 'dodecahedron', 'starTetrahedron', 'compound5', 'stellationDodec', 'rhombicHexecontahedron'];
+
+const PHI = (1 + Math.sqrt(5)) / 2;
+const INV_PHI = 1 / PHI;
+const SQ3 = Math.sqrt(3);
+function murmurPolyhedronData() {
+  const tetV = 1 / SQ3;
+  const tetrahedron = {
+    vertices: [
+      [tetV, tetV, tetV], [tetV, -tetV, -tetV], [-tetV, tetV, -tetV], [-tetV, -tetV, tetV]
+    ],
+    edges: [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]],
+    faces: [[0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]]
+  };
+  const r = 1 / SQ3;
+  const dodecRaw = [
+    [r, r, r], [r, r, -r], [r, -r, r], [r, -r, -r], [-r, r, r], [-r, r, -r], [-r, -r, r], [-r, -r, -r],
+    [0, PHI, INV_PHI], [0, PHI, -INV_PHI], [0, -PHI, INV_PHI], [0, -PHI, -INV_PHI],
+    [INV_PHI, 0, PHI], [INV_PHI, 0, -PHI], [-INV_PHI, 0, PHI], [-INV_PHI, 0, -PHI],
+    [PHI, INV_PHI, 0], [PHI, -INV_PHI, 0], [-PHI, INV_PHI, 0], [-PHI, -INV_PHI, 0]
+  ];
+  const dodecNorm = dodecRaw.map(([x, y, z]) => {
+    const len = Math.sqrt(x * x + y * y + z * z);
+    return [x / len, y / len, z / len];
+  });
+  const dodecahedron = {
+    vertices: dodecNorm,
+    edges: [
+      [0, 8], [0, 12], [0, 16], [1, 8], [1, 13], [1, 16], [2, 10], [2, 12], [2, 17], [3, 10], [3, 13], [3, 17],
+      [4, 8], [4, 14], [4, 18], [5, 8], [5, 15], [5, 18], [6, 10], [6, 14], [6, 19], [7, 10], [7, 15], [7, 19],
+      [8, 9], [9, 11], [9, 13], [9, 15], [11, 12], [11, 14], [12, 13], [14, 15], [16, 17], [16, 18], [17, 19], [18, 19]
+    ],
+    faces: [
+      [0, 8, 9, 1, 16], [0, 16, 17, 2, 12], [0, 12, 14, 4, 8], [1, 9, 5, 18, 16], [2, 17, 3, 13, 12],
+      [3, 10, 7, 15, 13], [4, 14, 6, 10, 8], [5, 9, 8, 4, 18], [6, 14, 12, 2, 10], [7, 19, 17, 3, 15],
+      [11, 13, 9, 8, 12], [11, 12, 2, 10, 14]
+    ]
+  };
+  const starTetrahedron = {
+    vertices: tetrahedron.vertices.concat([
+      [-tetV, -tetV, -tetV], [-tetV, tetV, tetV], [tetV, -tetV, tetV], [tetV, tetV, -tetV]
+    ]),
+    edges: [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3], [4, 5], [4, 6], [4, 7], [5, 6], [5, 7], [6, 7]],
+    faces: [[0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3], [4, 5, 6], [4, 5, 7], [4, 6, 7], [5, 6, 7]]
+  };
+  const compound5 = {
+    vertices: dodecNorm,
+    edges: [
+      [0, 8], [0, 12], [0, 16], [8, 12], [8, 16], [12, 16],
+      [1, 9], [1, 13], [1, 16], [9, 13], [9, 16], [13, 16],
+      [2, 10], [2, 14], [2, 17], [10, 14], [10, 17], [14, 17],
+      [3, 11], [3, 15], [3, 17], [11, 15], [11, 17], [15, 17],
+      [4, 8], [4, 10], [4, 18], [8, 10], [8, 18], [10, 18]
+    ],
+    faces: [
+      [0, 8, 12], [0, 8, 16], [0, 12, 16], [8, 12, 16],
+      [1, 9, 13], [1, 9, 16], [1, 13, 16], [9, 13, 16],
+      [2, 10, 14], [2, 10, 17], [2, 14, 17], [10, 14, 17],
+      [3, 11, 15], [3, 11, 17], [3, 15, 17], [11, 15, 17],
+      [4, 8, 10], [4, 8, 18], [4, 10, 18], [8, 10, 18]
+    ]
+  };
+  const stellationDodec = {
+    vertices: dodecNorm,
+    edges: dodecahedron.edges,
+    faces: dodecahedron.faces
+  };
+  const C0 = Math.sqrt(10 * (5 - Math.sqrt(5))) / 10;
+  const C1 = Math.sqrt(10 * (5 + Math.sqrt(5))) / 10;
+  const C2 = Math.sqrt(5 * (5 + 2 * Math.sqrt(5))) / 5;
+  const C3 = Math.sqrt(10 * (5 + Math.sqrt(5))) / 5;
+  const C4 = Math.sqrt(10 * (25 + 11 * Math.sqrt(5))) / 10;
+  const rhombicVertices = [
+    [0, 0, C3], [0, 0, -C3], [C3, 0, 0], [-C3, 0, 0], [0, C3, 0], [0, -C3, 0],
+    [0, C1, C4], [0, C1, -C4], [0, -C1, C4], [0, -C1, -C4], [C4, 0, C1], [C4, 0, -C1], [-C4, 0, C1], [-C4, 0, -C1],
+    [C1, C4, 0], [C1, -C4, 0], [-C1, C4, 0], [-C1, -C4, 0],
+    [C0, 0, C1], [C0, 0, -C1], [-C0, 0, C1], [-C0, 0, -C1], [C1, C0, 0], [C1, -C0, 0], [-C1, C0, 0], [-C1, -C0, 0],
+    [0, C1, C0], [0, C1, -C0], [0, -C1, C0], [0, -C1, -C0],
+    [C0, C1, C2], [C0, C1, -C2], [C0, -C1, C2], [C0, -C1, -C2], [-C0, C1, C2], [-C0, C1, -C2], [-C0, -C1, C2], [-C0, -C1, -C2],
+    [C2, C0, C1], [C2, C0, -C1], [C2, -C0, C1], [C2, -C0, -C1], [-C2, C0, C1], [-C2, C0, -C1], [-C2, -C0, C1], [-C2, -C0, -C1],
+    [C1, C2, C0], [C1, C2, -C0], [C1, -C2, C0], [C1, -C2, -C0], [-C1, C2, C0], [-C1, C2, -C0], [-C1, -C2, C0], [-C1, -C2, -C0],
+    [C2, C2, C2], [C2, C2, -C2], [C2, -C2, C2], [C2, -C2, -C2], [-C2, C2, C2], [-C2, C2, -C2], [-C2, -C2, C2], [-C2, -C2, -C2]
+  ];
+  const rhombicFaces = [
+    [18, 0, 8, 32], [18, 32, 56, 40], [18, 40, 10, 38], [18, 38, 54, 30], [18, 30, 6, 0],
+    [19, 1, 7, 31], [19, 31, 55, 39], [19, 39, 11, 41], [19, 41, 57, 33], [19, 33, 9, 1],
+    [20, 0, 6, 34], [20, 34, 58, 42], [20, 42, 12, 44], [20, 44, 60, 36], [20, 36, 8, 0],
+    [21, 1, 9, 37], [21, 37, 61, 45], [21, 45, 13, 43], [21, 43, 59, 35], [21, 35, 7, 1],
+    [22, 2, 11, 39], [22, 39, 55, 47], [22, 47, 14, 46], [22, 46, 54, 38], [22, 38, 10, 2],
+    [23, 2, 10, 40], [23, 40, 56, 48], [23, 48, 15, 49], [23, 49, 57, 41], [23, 41, 11, 2],
+    [24, 3, 12, 42], [24, 42, 58, 50], [24, 50, 16, 51], [24, 51, 59, 43], [24, 43, 13, 3],
+    [25, 3, 13, 45], [25, 45, 61, 53], [25, 53, 17, 52], [25, 52, 60, 44], [25, 44, 12, 3],
+    [26, 4, 16, 50], [26, 50, 58, 34], [26, 34, 6, 30], [26, 30, 54, 46], [26, 46, 14, 4],
+    [27, 4, 14, 47], [27, 47, 55, 31], [27, 31, 7, 35], [27, 35, 59, 51], [27, 51, 16, 4],
+    [28, 5, 15, 48], [28, 48, 56, 32], [28, 32, 8, 36], [28, 36, 60, 52], [28, 52, 17, 5],
+    [29, 5, 17, 53], [29, 53, 61, 37], [29, 37, 9, 33], [29, 33, 57, 49], [29, 49, 15, 5]
+  ];
+  const rhombicEdges = [];
+  const rhombicEdgeSet = new Set();
+  for (const f of rhombicFaces) {
+    for (let i = 0; i < 4; i++) {
+      const a = f[i], b = f[(i + 1) % 4];
+      const key = a < b ? a + ',' + b : b + ',' + a;
+      if (!rhombicEdgeSet.has(key)) { rhombicEdgeSet.add(key); rhombicEdges.push([a, b]); }
+    }
+  }
+  const rhombicHexecontahedron = { vertices: rhombicVertices, edges: rhombicEdges, faces: rhombicFaces };
+  return { tetrahedron, dodecahedron, starTetrahedron, compound5, stellationDodec, rhombicHexecontahedron };
+}
+let MURMUR_POLYHEDRA_CACHE = null;
+function MURMUR_POLYHEDRA() {
+  if (!MURMUR_POLYHEDRA_CACHE) MURMUR_POLYHEDRA_CACHE = murmurPolyhedronData();
+  return MURMUR_POLYHEDRA_CACHE;
+}
+
 let attractors = [];
 let nextAttractorId = 1;
 let selectedAttractorId = null;
@@ -82,8 +198,8 @@ function lightenRgb(r, g, b, t) {
 function defaultAttractorState() {
   return {
     mode: 'lorenz',
-    speedMultiplier: 0.5,
-    numParticles: 500,
+    speedMultiplier: 0.4,
+    numParticles: 800,
     showLines: true,
     twinkleSpeed: 0.02,
     baseOpacity: 80,
@@ -93,10 +209,10 @@ function defaultAttractorState() {
     rosslerPaths: [],
     murmurVertices: [],
     murmurBoids: [],
-    murmurBoxExtent: MURMUR_DEFAULT_BOX,
+    murmurBoxExtent: 23,
     murmurVerticalScale: MURMUR_VERTICAL_SCALE_DEFAULT,
-    murmurGridSize: MURMUR_DEFAULT_GRID,
-    murmurSpacing: 1,
+    murmurGridSize: 12,
+    murmurSpacing: 0.3,
     murmurVideo: null,
     murmurVideoObjectURL: null,
     murmurVideoReady: false,
@@ -104,26 +220,33 @@ function defaultAttractorState() {
     murmurGifObjectURL: null,
     murmurGifReady: false,
     murmurGifBuffer: null,
-    murmurWaveSpeed: 0.02,
-    murmurBlobWeight: 0.4,
+    murmurWaveSpeed: 0.005,
+    murmurBlobWeight: 0.25,
     murmurBlob: { x: 5, y: 5, z: 5 },
-    murmurShowFluctuations: false,
+    murmurShowFluctuations: true,
     murmurLorenzPath: [],
     murmurLorenzPhase: { x: 5, y: 5, z: 5 },
-    murmurLorenzWeight: MURMUR_LORENZ_WEIGHT_DEFAULT,
+    murmurLorenzWeight: 0,
     murmurSwarmIds: [],
     murmurClusterFrame: 0,
-    murmurShowTrails: true,
-    murmurShowGrid: true,
-    murmurShowInstrumentation: false,
-    murmurBirdShape: true,
-    murmurBaseColorHex: '#00d4ff',
+    murmurShowTrails: false,
+    murmurShowGrid: false,
+    murmurShowInstrumentation: true,
+    murmurBirdShape: false,
+    murmurBaseColorHex: '#B53946',
     murmurBoxBreathe: true,
-    murmurBoxBreatheSpeed: 0.02,
+    murmurBoxBreatheSpeed: 0.014,
     murmurCurrentExtent: 2.4,
     murmurSwarmCentroids: [],
     murmurSwarmCounts: [],
-    murmurContainerShape: 'box',
+    murmurNumSwarms: 0,
+    murmurContainerShape: 'torus',
+    murmurTweenFrom: 'box',
+    murmurTweenTo: 'sphere',
+    murmurTweenBlend: 0,
+    murmurTweenDurationSec: 2,
+    murmurSuperquadN: 2,
+    murmurSuperquadNAuto: false,
     scaleToWorld: LORENZ_SCALE,
     offsetX: 0,
     offsetY: 0,
@@ -514,6 +637,49 @@ function murmurClusterBoids(boids, extent, clusterRadius, mergeRadius) {
   return { swarmIds, centroids: outCentroids, counts: outCounts };
 }
 
+function murmurMergeSwarmsToTarget(swarmIds, centroids, counts, boids, target) {
+  if (target <= 0) return { swarmIds, centroids, counts };
+  let K = counts.filter((c) => c > 0).length;
+  if (K <= target) return { swarmIds, centroids, counts };
+  const n = boids.length;
+  const ids = swarmIds.slice();
+  const cents = centroids.map((c) => ({ x: c.x, y: c.y, z: c.z }));
+  const cnts = counts.slice();
+  while (K > target) {
+    let bestD = Infinity, bestS1 = -1, bestS2 = -1;
+    for (let s1 = 0; s1 < cnts.length; s1++) {
+      if (cnts[s1] === 0) continue;
+      for (let s2 = s1 + 1; s2 < cnts.length; s2++) {
+        if (cnts[s2] === 0) continue;
+        const dx = cents[s2].x - cents[s1].x, dy = cents[s2].y - cents[s1].y, dz = cents[s2].z - cents[s1].z;
+        const d = dx * dx + dy * dy + dz * dz;
+        if (d < bestD) { bestD = d; bestS1 = s1; bestS2 = s2; }
+      }
+    }
+    if (bestS1 < 0 || bestS2 < 0) break;
+    for (let i = 0; i < n; i++) if (ids[i] === bestS2) ids[i] = bestS1;
+    cnts[bestS1] += cnts[bestS2];
+    cnts[bestS2] = 0;
+    cents[bestS1].x = 0; cents[bestS1].y = 0; cents[bestS1].z = 0;
+    for (let i = 0; i < n; i++) {
+      if (ids[i] !== bestS1) continue;
+      const b = boids[i];
+      cents[bestS1].x += b.x; cents[bestS1].y += b.y; cents[bestS1].z += b.z;
+    }
+    const c = cnts[bestS1];
+    if (c > 0) { cents[bestS1].x /= c; cents[bestS1].y /= c; cents[bestS1].z /= c; }
+    K--;
+  }
+  const alive = [];
+  for (let s = 0; s < cnts.length; s++) if (cnts[s] > 0) alive.push(s);
+  const remap = new Map();
+  alive.forEach((id, idx) => remap.set(id, idx));
+  const outIds = ids.map((s) => remap.get(s));
+  const outCentroids = alive.map((s) => ({ x: cents[s].x, y: cents[s].y, z: cents[s].z }));
+  const outCounts = alive.map((s) => cnts[s]);
+  return { swarmIds: outIds, centroids: outCentroids, counts: outCounts };
+}
+
 function murmurContainBoid(b, extent, extentY, shape) {
   const { sqrt, abs, min, max } = Math;
   if (shape === 'box') {
@@ -608,6 +774,145 @@ function murmurContainBoid(b, extent, extentY, shape) {
     if (vr > 0) { b.vx -= 2 * vr * nx; b.vy -= 2 * vr * ny; b.vz -= 2 * vr * nz; }
     return;
   }
+  const poly = MURMUR_POLYHEDRA()[shape];
+  if (poly) {
+    if (poly.vertices && poly.vertices.length > 0) {
+      murmurContainBoidPolyhedron(b, extent, shape);
+    } else {
+      murmurContainBoid(b, extent, extent, 'sphere');
+    }
+  }
+}
+
+function murmurContainBoidPolyhedron(b, extent, shapeId) {
+  const { sqrt, abs } = Math;
+  const poly = MURMUR_POLYHEDRA()[shapeId];
+  if (!poly || !poly.vertices || !poly.faces || poly.vertices.length === 0) return;
+  const scale = extent;
+  const verts = poly.vertices.map(([x, y, z]) => ({ x: x * scale, y: y * scale, z: z * scale }));
+  const eps = 1e-9;
+  let inside = true;
+  let bestDist = Infinity;
+  let bestP = { x: b.x, y: b.y, z: b.z };
+  let bestN = { x: 0, y: 0, z: 0 };
+  for (let f = 0; f < poly.faces.length; f++) {
+    const face = poly.faces[f];
+    const v0 = verts[face[0]];
+    const v1 = verts[face[1]];
+    const v2 = verts[face[2]];
+    const e1x = v1.x - v0.x, e1y = v1.y - v0.y, e1z = v1.z - v0.z;
+    const e2x = v2.x - v0.x, e2y = v2.y - v0.y, e2z = v2.z - v0.z;
+    let nx = e1y * e2z - e1z * e2y;
+    let ny = e1z * e2x - e1x * e2z;
+    let nz = e1x * e2y - e1y * e2x;
+    const nlen = sqrt(nx * nx + ny * ny + nz * nz) || 1e-9;
+    nx /= nlen; ny /= nlen; nz /= nlen;
+    const d = -(nx * v0.x + ny * v0.y + nz * v0.z);
+    const dist = nx * b.x + ny * b.y + nz * b.z + d;
+    if (dist > eps) inside = false;
+    if (dist <= 0) continue;
+    const projX = b.x - dist * nx;
+    const projY = b.y - dist * ny;
+    const projZ = b.z - dist * nz;
+    const faceV = face.map(i => verts[i]);
+    const onFace = murmurPointInConvexFace(projX, projY, projZ, faceV);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestN = { x: nx, y: ny, z: nz };
+      bestP = onFace ? { x: projX, y: projY, z: projZ } : murmurNearestPointOnFace(projX, projY, projZ, faceV);
+    }
+  }
+  if (inside) return;
+  if (bestDist === Infinity) return;
+  b.x = bestP.x; b.y = bestP.y; b.z = bestP.z;
+  const vr = b.vx * bestN.x + b.vy * bestN.y + b.vz * bestN.z;
+  if (vr > 0) {
+    b.vx -= 2 * vr * bestN.x;
+    b.vy -= 2 * vr * bestN.y;
+    b.vz -= 2 * vr * bestN.z;
+  }
+}
+
+function murmurPointInConvexFace(px, py, pz, faceVerts) {
+  if (faceVerts.length < 3) return false;
+  const v0 = faceVerts[0];
+  const n = faceVerts.length;
+  for (let i = 0; i < n; i++) {
+    const v1 = faceVerts[i];
+    const v2 = faceVerts[(i + 1) % n];
+    const ex = v2.x - v1.x, ey = v2.y - v1.y, ez = v2.z - v1.z;
+    const tx = v0.x - v1.x, ty = v0.y - v1.y, tz = v0.z - v1.z;
+    let nx = ey * tz - ez * ty;
+    let ny = ez * tx - ex * tz;
+    let nz = ex * ty - ey * tx;
+    const cx = (v1.x + v2.x + v0.x) / 3 - v1.x;
+    const cy = (v1.y + v2.y + v0.y) / 3 - v1.y;
+    const cz = (v1.z + v2.z + v0.z) / 3 - v1.z;
+    if (nx * cx + ny * cy + nz * cz < 0) { nx = -nx; ny = -ny; nz = -nz; }
+    const px_ = px - v1.x, py_ = py - v1.y, pz_ = pz - v1.z;
+    if (nx * px_ + ny * py_ + nz * pz_ > 1e-6) return false;
+  }
+  return true;
+}
+
+function murmurNearestPointOnFace(px, py, pz, faceVerts) {
+  const { sqrt } = Math;
+  const n = faceVerts.length;
+  let bestD2 = Infinity;
+  let best = { x: faceVerts[0].x, y: faceVerts[0].y, z: faceVerts[0].z };
+  for (let i = 0; i < n; i++) {
+    const v1 = faceVerts[i];
+    const v2 = faceVerts[(i + 1) % n];
+    const ex = v2.x - v1.x, ey = v2.y - v1.y, ez = v2.z - v1.z;
+    const t = Math.max(0, Math.min(1, ((px - v1.x) * ex + (py - v1.y) * ey + (pz - v1.z) * ez) / (ex * ex + ey * ey + ez * ez + 1e-18)));
+    const qx = v1.x + t * ex, qy = v1.y + t * ey, qz = v1.z + t * ez;
+    const d2 = (px - qx) ** 2 + (py - qy) ** 2 + (pz - qz) ** 2;
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      best = { x: qx, y: qy, z: qz };
+    }
+    const vd2 = (px - v1.x) ** 2 + (py - v1.y) ** 2 + (pz - v1.z) ** 2;
+    if (vd2 < bestD2) {
+      bestD2 = vd2;
+      best = { x: v1.x, y: v1.y, z: v1.z };
+    }
+  }
+  return best;
+}
+
+function murmurContainBoidSuperquad(b, extent, extentY, n) {
+  const { sqrt, abs, pow } = Math;
+  const a = extent;
+  const c = extent;
+  const d = extentY;
+  const ax = abs(b.x) / a;
+  const ay = abs(b.y) / d;
+  const az = abs(b.z) / c;
+  const f = pow(pow(ax, n) + pow(ay, n) + pow(az, n), 1 / n);
+  if (f <= 1) return;
+  const s = 1 / f;
+  b.x *= s;
+  b.y *= s;
+  b.z *= s;
+  const signX = b.x >= 0 ? 1 : -1;
+  const signY = b.y >= 0 ? 1 : -1;
+  const signZ = b.z >= 0 ? 1 : -1;
+  const ax2 = abs(b.x) / a;
+  const ay2 = abs(b.y) / d;
+  const az2 = abs(b.z) / c;
+  const gx = signX * pow(ax2, n - 1) / a;
+  const gy = signY * pow(ay2, n - 1) / d;
+  const gz = signZ * pow(az2, n - 1) / c;
+  const glen = sqrt(gx * gx + gy * gy + gz * gz) || 1e-9;
+  const nx = gx / glen;
+  const ny = gy / glen;
+  const nz = gz / glen;
+  const vr = b.vx * nx + b.vy * ny + b.vz * nz;
+  if (vr > 0) {
+    b.vx -= 2 * vr * nx;
+    b.vy -= 2 * vr * ny;
+    b.vz -= 2 * vr * nz;
+  }
 }
 
 function murmurBoidStep(a) {
@@ -623,6 +928,22 @@ function murmurBoidStep(a) {
   a.murmurCurrentExtent = extent;
   const vertScale = Math.max(0.15, Math.min(1, a.murmurVerticalScale ?? MURMUR_VERTICAL_SCALE_DEFAULT));
   const extentY = extent * vertScale;
+
+  if (MURMUR_TWEEN_MODE === 1 || MURMUR_TWEEN_MODE === 3) {
+    let blend = a.murmurTweenBlend != null ? a.murmurTweenBlend : 0;
+    if (blend < 1) {
+      const dur = Math.max(0.1, a.murmurTweenDurationSec != null ? a.murmurTweenDurationSec : 2);
+      blend = Math.min(1, blend + 1 / (dur * 60));
+      a.murmurTweenBlend = blend;
+      if (blend >= 1) {
+        a.murmurTweenFrom = a.murmurTweenTo;
+      }
+    }
+  }
+  if (MURMUR_TWEEN_MODE === 2 && a.murmurSuperquadNAuto) {
+    const t = (frameCount * 0.02) % (2 * Math.PI);
+    a.murmurSuperquadN = 2 + (10 - 2) * (0.5 + 0.5 * Math.sin(t));
+  }
 
   const spd = (a.speedMultiplier != null) ? a.speedMultiplier : 1;
   const dt = DT * spd * 2;
@@ -642,7 +963,11 @@ function murmurBoidStep(a) {
   a.murmurClusterFrame = (a.murmurClusterFrame || 0) + 1;
   if (a.murmurClusterFrame >= MURMUR_CLUSTER_EVERY) {
     a.murmurClusterFrame = 0;
-    const result = murmurClusterBoids(boids, extent, MURMUR_CLUSTER_RADIUS, MURMUR_MERGE_RADIUS);
+    let result = murmurClusterBoids(boids, extent, MURMUR_CLUSTER_RADIUS, MURMUR_MERGE_RADIUS);
+    const targetSwarms = Math.max(0, Math.min(30, a.murmurNumSwarms ?? 0));
+    if (targetSwarms > 0 && result.centroids.length > targetSwarms) {
+      result = murmurMergeSwarmsToTarget(result.swarmIds, result.centroids, result.counts, boids, targetSwarms);
+    }
     a.murmurSwarmIds = result.swarmIds;
     a.murmurSwarmCentroids = result.centroids;
     a.murmurSwarmCounts = result.counts;
@@ -784,8 +1109,17 @@ function murmurBoidStep(a) {
     b.y += b.vy * spd;
     b.z += b.vz * spd;
 
-    const containerShape = a.murmurContainerShape || 'box';
-    murmurContainBoid(b, extent, extentY, containerShape);
+    let containerShape = a.murmurContainerShape || 'box';
+    if (MURMUR_TWEEN_MODE === 1 || MURMUR_TWEEN_MODE === 3) {
+      const blend = a.murmurTweenBlend != null ? a.murmurTweenBlend : 0;
+      containerShape = blend >= 1 ? (a.murmurTweenTo || 'box') : (a.murmurTweenFrom || 'box');
+      murmurContainBoid(b, extent, extentY, containerShape);
+    } else if (MURMUR_TWEEN_MODE === 2) {
+      const n = Math.max(0.5, a.murmurSuperquadN != null ? a.murmurSuperquadN : 2);
+      murmurContainBoidSuperquad(b, extent, extentY, n);
+    } else {
+      murmurContainBoid(b, extent, extentY, containerShape);
+    }
     if (!b.trail) b.trail = [];
     b.trail.push({ x: b.x, y: b.y, z: b.z });
     if (b.trail.length > MURMUR_TRAIL_LENGTH) b.trail.shift();
@@ -839,6 +1173,7 @@ function createPanelForAttractor(a) {
       </div>
       <div class="panel-section murmuration-only">
         <div class="panel-section-title">Convergence</div>
+        <div class="slider-row"><label for="${pre}numSwarms">Swarms</label><input type="range" id="${pre}numSwarms" min="0" max="30" value="${a.murmurNumSwarms ?? 0}" step="1"><span class="value" id="${pre}numSwarmsVal">${a.murmurNumSwarms === 0 ? 'auto' : (a.murmurNumSwarms ?? 0)}</span></div>
         <div class="slider-row"><span class="value"><span id="${pre}convergenceSwarms">1</span> swarms</span></div>
         <div class="slider-row"><span class="value">phase <span id="${pre}convergencePhase">0</span></span></div>
         <div class="slider-row"><label for="${pre}lorenzWeight">Lorenz pull</label><input type="range" id="${pre}lorenzWeight" min="0" max="0.25" value="${a.murmurLorenzWeight ?? MURMUR_LORENZ_WEIGHT_DEFAULT}" step="0.01"><span class="value" id="${pre}lorenzWeightVal">${((a.murmurLorenzWeight ?? MURMUR_LORENZ_WEIGHT_DEFAULT) * 100).toFixed(0)}%</span></div>
@@ -851,7 +1186,7 @@ function createPanelForAttractor(a) {
         <label class="toggle-row"><input type="checkbox" id="${pre}grid" ${a.murmurShowGrid !== false ? 'checked' : ''}><span>Grid</span></label>
         <label class="toggle-row"><input type="checkbox" id="${pre}instrumentation" ${a.murmurShowInstrumentation ? 'checked' : ''}><span>Show instrumentation</span></label>
         <div class="slider-row"><label for="${pre}fluctuations">Vectors</label><input type="checkbox" id="${pre}fluctuations" ${a.murmurShowFluctuations ? 'checked' : ''}><span class="value">Fluctuations (B)</span></div>
-        <div class="slider-row"><label for="${pre}containerShape">Container</label><select id="${pre}containerShape">
+        <div class="slider-row container-shape-row${MURMUR_TWEEN_MODE ? ' hidden-when-tween' : ''}"><label for="${pre}containerShape">Container</label><select id="${pre}containerShape">
           <option value="box" ${(a.murmurContainerShape || 'box') === 'box' ? 'selected' : ''}>Box</option>
           <option value="sphere" ${(a.murmurContainerShape || '') === 'sphere' ? 'selected' : ''}>Sphere</option>
           <option value="ellipsoid" ${(a.murmurContainerShape || '') === 'ellipsoid' ? 'selected' : ''}>Ellipsoid</option>
@@ -860,7 +1195,33 @@ function createPanelForAttractor(a) {
           <option value="torus" ${(a.murmurContainerShape || '') === 'torus' ? 'selected' : ''}>Torus</option>
           <option value="pyramid" ${(a.murmurContainerShape || '') === 'pyramid' ? 'selected' : ''}>Pyramid</option>
           <option value="dome" ${(a.murmurContainerShape || '') === 'dome' ? 'selected' : ''}>Dome</option>
+          <option value="tetrahedron" ${(a.murmurContainerShape || '') === 'tetrahedron' ? 'selected' : ''}>Tetrahedron</option>
+          <option value="dodecahedron" ${(a.murmurContainerShape || '') === 'dodecahedron' ? 'selected' : ''}>Dodecahedron</option>
+          <option value="starTetrahedron" ${(a.murmurContainerShape || '') === 'starTetrahedron' ? 'selected' : ''}>Star tetrahedron</option>
+          <option value="compound5" ${(a.murmurContainerShape || '') === 'compound5' ? 'selected' : ''}>Compound 5</option>
+          <option value="stellationDodec" ${(a.murmurContainerShape || '') === 'stellationDodec' ? 'selected' : ''}>Third stellation</option>
+          <option value="rhombicHexecontahedron" ${(a.murmurContainerShape || '') === 'rhombicHexecontahedron' ? 'selected' : ''}>Rhombic hexecontahedron</option>
         </select></div>
+        ${(MURMUR_TWEEN_MODE === 1 || MURMUR_TWEEN_MODE === 3) ? `
+        <div class="panel-section murmuration-only">
+          <div class="panel-section-title">Tween</div>
+          <div class="slider-row"><label for="${pre}tweenFrom">From</label><select id="${pre}tweenFrom">
+            ${MURMUR_TWEEN_SHAPES.map(s => `<option value="${s}" ${(a.murmurTweenFrom || 'box') === s ? 'selected' : ''}>${s}</option>`).join('')}
+          </select></div>
+          <div class="slider-row"><label for="${pre}tweenTo">To</label><select id="${pre}tweenTo">
+            ${MURMUR_TWEEN_SHAPES.map(s => `<option value="${s}" ${(a.murmurTweenTo || 'sphere') === s ? 'selected' : ''}>${s}</option>`).join('')}
+          </select></div>
+          <div class="slider-row"><label for="${pre}tweenDuration">Duration (s)</label><input type="range" id="${pre}tweenDuration" min="1" max="5" value="${a.murmurTweenDurationSec ?? 2}" step="0.5"><span class="value" id="${pre}tweenDurationVal">${((a.murmurTweenDurationSec ?? 2)).toFixed(1)}</span></div>
+          <button type="button" id="${pre}tweenRun" style="margin-top:8px;padding:6px 12px;background:#252528;color:#ccc;border:1px solid #333;border-radius:6px;cursor:pointer;font-size:11px;">Run tween</button>
+        </div>
+        ` : ''}
+        ${MURMUR_TWEEN_MODE === 2 ? `
+        <div class="panel-section murmuration-only">
+          <div class="panel-section-title">Superquadric</div>
+          <div class="slider-row"><label for="${pre}superquadN">Shape</label><input type="range" id="${pre}superquadN" min="2" max="12" value="${a.murmurSuperquadN ?? 2}" step="0.5"><span class="value" id="${pre}superquadNVal">${((a.murmurSuperquadN ?? 2)).toFixed(1)}</span></div>
+          <label class="toggle-row"><input type="checkbox" id="${pre}superquadAuto" ${a.murmurSuperquadNAuto ? 'checked' : ''}><span>Auto oscillate</span></label>
+        </div>
+        ` : ''}
         <label class="toggle-row"><input type="checkbox" id="${pre}boxBreathe" ${a.murmurBoxBreathe !== false ? 'checked' : ''}><span>Box breathe (3.5–5)</span></label>
         <div class="slider-row"><label for="${pre}boxBreatheSpeed">Breathe speed</label><input type="range" id="${pre}boxBreatheSpeed" min="0.002" max="0.12" value="${a.murmurBoxBreatheSpeed ?? 0.02}" step="0.002"><span class="value" id="${pre}boxBreatheSpeedVal">${((a.murmurBoxBreatheSpeed ?? 0.02) * 1000).toFixed(1)}</span></div>
         <div class="slider-row"><label for="${pre}boxExtent">Box size</label><input type="range" id="${pre}boxExtent" min="2" max="${MURMUR_BOX_MAX}" value="${a.murmurBoxExtent ?? MURMUR_DEFAULT_BOX}" step="1"><span class="value" id="${pre}boxExtentVal">${a.murmurBoxExtent ?? MURMUR_DEFAULT_BOX}</span></div>
@@ -956,6 +1317,35 @@ function bindPanelToAttractor(panelEl, a) {
   get('containerShape')?.addEventListener('change', (e) => {
     a.murmurContainerShape = e.target.value;
   });
+  if (MURMUR_TWEEN_MODE === 1 || MURMUR_TWEEN_MODE === 3) {
+    get('tweenFrom')?.addEventListener('change', (e) => {
+      a.murmurTweenFrom = e.target.value;
+    });
+    get('tweenTo')?.addEventListener('change', (e) => {
+      a.murmurTweenTo = e.target.value;
+    });
+    get('tweenDuration')?.addEventListener('input', (e) => {
+      const v = Number(e.target.value);
+      a.murmurTweenDurationSec = v;
+      get('tweenDurationVal').textContent = v.toFixed(1);
+    });
+    get('tweenRun')?.addEventListener('click', () => {
+      a.murmurTweenFrom = a.murmurTweenBlend >= 1 ? a.murmurTweenTo : a.murmurTweenFrom;
+      a.murmurTweenTo = get('tweenTo')?.value || 'sphere';
+      a.murmurTweenBlend = 0;
+      get('tweenFrom').value = a.murmurTweenFrom;
+    });
+  }
+  if (MURMUR_TWEEN_MODE === 2) {
+    get('superquadN')?.addEventListener('input', (e) => {
+      const v = Number(e.target.value);
+      a.murmurSuperquadN = v;
+      get('superquadNVal').textContent = v.toFixed(1);
+    });
+    get('superquadAuto')?.addEventListener('change', (e) => {
+      a.murmurSuperquadNAuto = e.target.checked;
+    });
+  }
   get('boxBreathe')?.addEventListener('change', (e) => {
     a.murmurBoxBreathe = e.target.checked;
   });
@@ -1011,6 +1401,13 @@ function bindPanelToAttractor(panelEl, a) {
     const v = Number(e.target.value);
     a.murmurBlobWeight = v;
     get('blobWeightVal').textContent = (v * 100).toFixed(0) + '%';
+  });
+
+  get('numSwarms')?.addEventListener('input', (e) => {
+    const v = Math.round(Number(e.target.value));
+    a.murmurNumSwarms = v;
+    const valEl = get('numSwarmsVal');
+    if (valEl) valEl.textContent = v === 0 ? 'auto' : String(v);
   });
 
   get('lorenzWeight')?.addEventListener('input', (e) => {
@@ -1259,6 +1656,320 @@ function setup() {
   createPanelForAttractor(first);
 }
 
+function drawContainerShape(shape, e, eY, strokeAlpha) {
+  stroke(200, 30, 70, strokeAlpha);
+  strokeWeight(0.015);
+  noFill();
+  if (shape === 'box') {
+    line(-e, -e, -e, e, -e, -e); line(e, -e, -e, e, e, -e); line(e, e, -e, -e, e, -e); line(-e, e, -e, -e, -e, -e);
+    line(-e, -e, e, e, -e, e); line(e, -e, e, e, e, e); line(e, e, e, -e, e, e); line(-e, e, e, -e, -e, e);
+    line(-e, -e, -e, -e, -e, e); line(e, -e, -e, e, -e, e); line(e, e, -e, e, e, e); line(-e, e, -e, -e, e, e);
+  } else if (shape === 'sphere') {
+    sphere(e, 20, 14);
+  } else if (shape === 'ellipsoid') {
+    push();
+    scale(1, 1, eY / e);
+    sphere(e, 20, 14);
+    pop();
+  } else if (shape === 'cylinder') {
+    push();
+    rotateX(HALF_PI);
+    cylinder(e, 2 * eY, 24, 1, true, true);
+    pop();
+  } else if (shape === 'cone') {
+    push();
+    translate(0, 0, -eY);
+    rotateX(-HALF_PI);
+    cone(e, 2 * eY, 24, 1);
+    pop();
+  } else if (shape === 'torus') {
+    push();
+    rotateX(HALF_PI);
+    torus(e, e * MURMUR_TORUS_MINOR, 24, 12);
+    pop();
+  } else if (shape === 'pyramid') {
+    line(0, 0, eY, -e, -e, -eY); line(0, 0, eY, e, -e, -eY); line(0, 0, eY, e, e, -eY); line(0, 0, eY, -e, e, -eY);
+    line(-e, -e, -eY, e, -e, -eY); line(e, -e, -eY, e, e, -eY); line(e, e, -eY, -e, e, -eY); line(-e, e, -eY, -e, -e, -eY);
+  } else if (shape === 'dome') {
+    const steps = 12;
+    const halfPi = PI / 2;
+    for (let i = 0; i <= steps; i++) {
+      const theta = (i / steps) * halfPi;
+      const ct = cos(theta); const st = sin(theta);
+      for (let j = 0; j < 24; j++) {
+        const phi = (j / 24) * TWO_PI;
+        const cp = cos(phi); const sp = sin(phi);
+        const x = e * ct * cp; const z = e * ct * sp; const y = e * st;
+        if (j > 0) {
+          const phi0 = ((j - 1) / 24) * TWO_PI;
+          const cp0 = cos(phi0); const sp0 = sin(phi0);
+          const x0 = e * ct * cp0; const z0 = e * ct * sp0; const y0 = e * st;
+          line(x0, z0, y0, x, z, y);
+        }
+        if (i > 0) {
+          const theta0 = ((i - 1) / steps) * halfPi;
+          const ct0 = cos(theta0); const st0 = sin(theta0);
+          const x0 = e * ct0 * cp; const z0 = e * ct0 * sp; const y0 = e * st0;
+          line(x0, z0, y0, x, z, y);
+        }
+      }
+    }
+  } else {
+    const poly = MURMUR_POLYHEDRA()[shape];
+    if (poly && poly.vertices && poly.edges && poly.vertices.length > 0) {
+      const s = e;
+      for (let k = 0; k < poly.edges.length; k++) {
+        const [i, j] = poly.edges[k];
+        const v0 = poly.vertices[i], v1 = poly.vertices[j];
+        line(v0[0] * s, v0[2] * s, v0[1] * s, v1[0] * s, v1[2] * s, v1[1] * s);
+      }
+    } else if (poly && (!poly.vertices || poly.vertices.length === 0)) {
+      sphere(e, 20, 14);
+    }
+  }
+}
+
+function drawSuperquadWireframe(e, eY, n) {
+  const a = e; const b = eY; const c = e;
+  const steps = 14;
+  stroke(200, 30, 70, 20);
+  strokeWeight(0.015);
+  noFill();
+  const pow = Math.pow;
+  const abs = Math.abs;
+  for (let i = 0; i <= steps; i++) {
+    const phi = (i / steps) * PI;
+    const sp = sin(phi); const cp = cos(phi);
+    for (let j = 0; j < 20; j++) {
+      const theta = (j / 20) * TWO_PI;
+      const st = sin(theta); const ct = cos(theta);
+      const dx = cp * ct;
+      const dy = sp;
+      const dz = cp * st;
+      const sum = pow(abs(dx / a), n) + pow(abs(dy / b), n) + pow(abs(dz / c), n);
+      const t = sum <= 1e-9 ? 0 : pow(sum, -1 / n);
+      const x = t * dx; const y = t * dy; const z = t * dz;
+      if (j > 0) {
+        const theta0 = ((j - 1) / 20) * TWO_PI;
+        const st0 = sin(theta0); const ct0 = cos(theta0);
+        const dx0 = cp * ct0; const dy0 = sp; const dz0 = cp * st0;
+        const sum0 = pow(abs(dx0 / a), n) + pow(abs(dy0 / b), n) + pow(abs(dz0 / c), n);
+        const t0 = sum0 <= 1e-9 ? 0 : pow(sum0, -1 / n);
+        const x0 = t0 * dx0; const y0 = t0 * dy0; const z0 = t0 * dz0;
+        line(x0, z0, y0, x, z, y);
+      }
+      if (i > 0) {
+        const phi0 = ((i - 1) / steps) * PI;
+        const sp0 = sin(phi0); const cp0 = cos(phi0);
+        const dx0 = cp0 * ct; const dy0 = sp0; const dz0 = cp0 * st;
+        const sum0 = pow(abs(dx0 / a), n) + pow(abs(dy0 / b), n) + pow(abs(dz0 / c), n);
+        const t0 = sum0 <= 1e-9 ? 0 : pow(sum0, -1 / n);
+        const x0 = t0 * dx0; const y0 = t0 * dy0; const z0 = t0 * dz0;
+        line(x0, z0, y0, x, z, y);
+      }
+    }
+  }
+  noStroke();
+}
+
+function sign(x) {
+  return x >= 0 ? 1 : -1;
+}
+
+let murmurIcoVertices = null;
+let murmurIcoEdges = null;
+function murmurIcosahedronMesh() {
+  if (murmurIcoVertices) return { vertices: murmurIcoVertices, edges: murmurIcoEdges };
+  const phi = (1 + Math.sqrt(5)) / 2;
+  const L = Math.sqrt(1 + phi * phi);
+  const raw = [
+    [0, 1, phi], [0, -1, phi], [0, 1, -phi], [0, -1, -phi],
+    [1, phi, 0], [-1, phi, 0], [1, -phi, 0], [-1, -phi, 0],
+    [phi, 0, 1], [-phi, 0, 1], [phi, 0, -1], [-phi, 0, -1]
+  ];
+  murmurIcoVertices = raw.map(([x, y, z]) => {
+    const len = Math.sqrt(x * x + y * y + z * z);
+    return { x: x / len, y: y / len, z: z / len };
+  });
+  murmurIcoEdges = [
+    [0, 1], [0, 4], [0, 8], [0, 9], [0, 5],
+    [1, 6], [1, 7], [1, 8], [1, 9],
+    [2, 3], [2, 5], [2, 10], [2, 11], [2, 4],
+    [3, 6], [3, 7], [3, 10], [3, 11],
+    [4, 5], [4, 8], [4, 10],
+    [5, 9], [5, 11],
+    [6, 7], [6, 8], [6, 10],
+    [7, 9], [7, 11],
+    [8, 10], [9, 11], [10, 11]
+  ];
+  return { vertices: murmurIcoVertices, edges: murmurIcoEdges };
+}
+
+function murmurSurfaceSample(shape, dx, dy, dz, extent, extentY) {
+  const abs = Math.abs;
+  const sqrt = Math.sqrt;
+  const e = extent;
+  const eY = extentY;
+  const eps = 1e-9;
+  if (shape === 'box') {
+    let t = Infinity;
+    if (dx > eps) t = Math.min(t, e / dx);
+    if (dx < -eps) t = Math.min(t, -e / dx);
+    if (dy > eps) t = Math.min(t, eY / dy);
+    if (dy < -eps) t = Math.min(t, -eY / dy);
+    if (dz > eps) t = Math.min(t, e / dz);
+    if (dz < -eps) t = Math.min(t, -e / dz);
+    if (t === Infinity || t <= 0) return { x: e, y: 0, z: 0 };
+    return { x: t * dx, y: t * dy, z: t * dz };
+  }
+  if (shape === 'sphere') {
+    const t = e;
+    return { x: t * dx, y: t * dy, z: t * dz };
+  }
+  if (shape === 'ellipsoid') {
+    const a = e; const b = eY; const c = e;
+    const sum = (dx * dx) / (a * a) + (dy * dy) / (b * b) + (dz * dz) / (c * c);
+    const t = sum <= eps ? 0 : 1 / sqrt(sum);
+    return { x: t * dx, y: t * dy, z: t * dz };
+  }
+  if (shape === 'cylinder') {
+    const r = sqrt(dx * dx + dz * dz) || eps;
+    const tCap = dy > eps ? eY / dy : dy < -eps ? -eY / dy : Infinity;
+    const tBody = e / r;
+    let t = Infinity;
+    if (tBody > 0 && abs(tBody * dy) <= eY) t = Math.min(t, tBody);
+    if (tCap > 0 && tCap * r <= e) t = Math.min(t, tCap);
+    if (t === Infinity || t <= 0) return { x: e * (dx / r), y: eY, z: e * (dz / r) };
+    return { x: t * dx, y: t * dy, z: t * dz };
+  }
+  if (shape === 'cone') {
+    const r = sqrt(dx * dx + dz * dz) || eps;
+    const tBase = dy < -eps ? -eY / dy : Infinity;
+    if (tBase !== Infinity && tBase * r <= e) return { x: tBase * dx, y: -eY, z: tBase * dz };
+    const D = dx * dx + dz * dz;
+    const qa = 4 * eY * eY * D - e * e * dy * dy;
+    const qb = 2 * e * e * eY * dy;
+    const qc = -e * e * eY * eY;
+    const disc = qb * qb - 4 * qa * qc;
+    if (disc < 0 || Math.abs(qa) < eps) return { x: e * (dx / r), y: -eY, z: e * (dz / r) };
+    const t1 = (-qb + sqrt(disc)) / (2 * qa);
+    const t2 = (-qb - sqrt(disc)) / (2 * qa);
+    let t = t1 > 0 && t1 * dy <= eY && t1 * dy >= -eY ? t1 : (t2 > 0 && t2 * dy <= eY && t2 * dy >= -eY ? t2 : Math.max(t1, t2));
+    if (t <= 0) return { x: e * (dx / r), y: -eY, z: e * (dz / r) };
+    return { x: t * dx, y: t * dy, z: t * dz };
+  }
+  if (shape === 'torus') {
+    const R = e; const r = e * MURMUR_TORUS_MINOR;
+    const rho = sqrt(dx * dx + dz * dz) || eps;
+    const denom = rho * rho + dy * dy;
+    if (denom < eps) return { x: R + r, y: 0, z: 0 };
+    const disc = 4 * R * R * rho * rho - 4 * denom * (R * R - r * r);
+    const t = disc < 0 ? R / sqrt(denom) : (2 * R * rho + sqrt(disc)) / (2 * denom);
+    if (t <= 0) return { x: R + r, y: 0, z: 0 };
+    return { x: t * dx, y: t * dy, z: t * dz };
+  }
+  if (shape === 'pyramid') {
+    const tBox = Math.min(
+      dx > eps ? e / dx : dx < -eps ? -e / dx : Infinity,
+      dy > eps ? eY / dy : dy < -eps ? -eY / dy : Infinity,
+      dz > eps ? e / dz : dz < -eps ? -e / dz : Infinity
+    );
+    if (tBox !== Infinity && tBox > 0) {
+      const px = tBox * dx; const py = tBox * dy; const pz = tBox * dz;
+      const w = e * (eY - py) / (2 * eY);
+      if (abs(px) <= w && abs(pz) <= w) return { x: px, y: py, z: pz };
+    }
+    const tBase = dy < -eps ? -eY / dy : Infinity;
+    if (tBase !== Infinity) {
+      const px = tBase * dx; const pz = tBase * dz;
+      if (abs(px) <= e && abs(pz) <= e) return { x: px, y: -eY, z: pz };
+    }
+    return { x: e * (dx / sqrt(dx * dx + dz * dz + eps)), y: -eY, z: e * (dz / sqrt(dx * dx + dz * dz + eps)) };
+  }
+  if (shape === 'dome') {
+    if (dy >= 0) return { x: e * dx, y: e * dy, z: e * dz };
+    const r = sqrt(dx * dx + dz * dz) || eps;
+    return { x: e * dx / r, y: 0, z: e * dz / r };
+  }
+  const poly = MURMUR_POLYHEDRA()[shape];
+  if (poly && poly.vertices && poly.faces && poly.vertices.length > 0) {
+    return murmurSurfaceSamplePolyhedron(dx, dy, dz, e, eY, poly);
+  }
+  return { x: e * dx, y: e * dy, z: e * dz };
+}
+
+function murmurSurfaceSamplePolyhedron(dx, dy, dz, extent, extentY, poly) {
+  const { sqrt } = Math;
+  const eps = 1e-9;
+  const scale = extent;
+  const verts = poly.vertices.map(([x, y, z]) => ({ x: x * scale, y: y * scale, z: z * scale }));
+  let bestT = Infinity;
+  for (let f = 0; f < poly.faces.length; f++) {
+    const face = poly.faces[f];
+    const v0 = verts[face[0]];
+    const v1 = verts[face[1]];
+    const v2 = verts[face[2]];
+    const e1x = v1.x - v0.x, e1y = v1.y - v0.y, e1z = v1.z - v0.z;
+    const e2x = v2.x - v0.x, e2y = v2.y - v0.y, e2z = v2.z - v0.z;
+    let nx = e1y * e2z - e1z * e2y;
+    let ny = e1z * e2x - e1x * e2z;
+    let nz = e1x * e2y - e1y * e2x;
+    const nlen = sqrt(nx * nx + ny * ny + nz * nz) || 1e-9;
+    nx /= nlen; ny /= nlen; nz /= nlen;
+    const denom = nx * dx + ny * dy + nz * dz;
+    if (denom >= -eps) continue;
+    const d = -(nx * v0.x + ny * v0.y + nz * v0.z);
+    const t = -(d + nx * 0 + ny * 0 + nz * 0) / denom;
+    if (t <= 0 || t >= bestT) continue;
+    const hx = t * dx, hy = t * dy, hz = t * dz;
+    const faceV = face.map(i => verts[i]);
+    if (murmurPointInConvexFace(hx, hy, hz, faceV)) bestT = t;
+    else if (face.length > 3) {
+      for (let i = 2; i < face.length; i++) {
+        const v3 = verts[face[i]];
+        const nv0 = v0, nv1 = verts[face[i - 1]], nv2 = v3;
+        const ne1x = nv1.x - nv0.x, ne1y = nv1.y - nv0.y, ne1z = nv1.z - nv0.z;
+        const ne2x = nv2.x - nv0.x, ne2y = nv2.y - nv0.y, ne2z = nv2.z - nv0.z;
+        let tnx = ne1y * ne2z - ne1z * ne2y, tny = ne1z * ne2x - ne1x * ne2z, tnz = ne1x * ne2y - ne1y * ne2x;
+        const tlen = sqrt(tnx * tnx + tny * tny + tnz * tnz) || 1e-9;
+        tnx /= tlen; tny /= tlen; tnz /= tlen;
+        const tdenom = tnx * dx + tny * dy + tnz * dz;
+        if (tdenom >= -eps) continue;
+        const td = -(tnx * nv0.x + tny * nv0.y + tnz * nv0.z);
+        const tt = -td / tdenom;
+        if (tt > 0 && tt < bestT && murmurPointInConvexFace(tt * dx, tt * dy, tt * dz, [nv0, nv1, nv2])) bestT = tt;
+      }
+    }
+  }
+  if (bestT === Infinity) return { x: extent * dx, y: extent * dy, z: extent * dz };
+  return { x: bestT * dx, y: bestT * dy, z: bestT * dz };
+}
+
+function drawVertexMorphWireframe(e, eY, shapeFrom, shapeTo, blend) {
+  const { vertices, edges } = murmurIcosahedronMesh();
+  const positions = [];
+  for (let i = 0; i < vertices.length; i++) {
+    const v = vertices[i];
+    const pA = murmurSurfaceSample(shapeFrom, v.x, v.y, v.z, e, eY);
+    const pB = murmurSurfaceSample(shapeTo, v.x, v.y, v.z, e, eY);
+    const t = Math.max(0, Math.min(1, blend));
+    positions.push({
+      x: pA.x + (pB.x - pA.x) * t,
+      y: pA.y + (pB.y - pA.y) * t,
+      z: pA.z + (pB.z - pA.z) * t
+    });
+  }
+  stroke(200, 30, 70, 20);
+  strokeWeight(0.015);
+  noFill();
+  for (let k = 0; k < edges.length; k++) {
+    const [i, j] = edges[k];
+    const a = positions[i];
+    const b = positions[j];
+    line(a.x, a.z, a.y, b.x, b.z, b.y);
+  }
+}
+
 function draw() {
   background(0, 0, 6);
 
@@ -1331,82 +2042,45 @@ function draw() {
       const e = extent;
       const eY = extentY;
       const containerShape = a.murmurContainerShape || 'box';
-      stroke(200, 30, 70, 20);
-      strokeWeight(0.015);
-      noFill();
-      if (containerShape === 'box') {
-        line(-e, -e, -e, e, -e, -e); line(e, -e, -e, e, e, -e); line(e, e, -e, -e, e, -e); line(-e, e, -e, -e, -e, -e);
-        line(-e, -e, e, e, -e, e); line(e, -e, e, e, e, e); line(e, e, e, -e, e, e); line(-e, e, e, -e, -e, e);
-        line(-e, -e, -e, -e, -e, e); line(e, -e, -e, e, -e, e); line(e, e, -e, e, e, e); line(-e, e, -e, -e, e, e);
-      } else if (containerShape === 'sphere') {
-        sphere(e, 20, 14);
-      } else if (containerShape === 'ellipsoid') {
-        push();
-        scale(1, 1, eY / e);
-        sphere(e, 20, 14);
-        pop();
-      } else if (containerShape === 'cylinder') {
-        push();
-        rotateX(HALF_PI);
-        cylinder(e, 2 * eY, 24, 1, true, true);
-        pop();
-      } else if (containerShape === 'cone') {
-        push();
-        translate(0, 0, -eY);
-        rotateX(-HALF_PI);
-        cone(e, 2 * eY, 24, 1);
-        pop();
-      } else if (containerShape === 'torus') {
-        push();
-        rotateX(HALF_PI);
-        torus(e, e * MURMUR_TORUS_MINOR, 24, 12);
-        pop();
-      } else if (containerShape === 'pyramid') {
-        line(0, 0, eY, -e, -e, -eY); line(0, 0, eY, e, -e, -eY); line(0, 0, eY, e, e, -eY); line(0, 0, eY, -e, e, -eY);
-        line(-e, -e, -eY, e, -e, -eY); line(e, -e, -eY, e, e, -eY); line(e, e, -eY, -e, e, -eY); line(-e, e, -eY, -e, -e, -eY);
-      } else if (containerShape === 'dome') {
-        const steps = 12;
-        const halfPi = PI / 2;
-        for (let i = 0; i <= steps; i++) {
-          const theta = (i / steps) * halfPi;
-          const ct = cos(theta); const st = sin(theta);
-          for (let j = 0; j < 24; j++) {
-            const phi = (j / 24) * TWO_PI;
-            const cp = cos(phi); const sp = sin(phi);
-            const x = e * ct * cp; const z = e * ct * sp; const y = e * st;
-            if (j > 0) {
-              const phi0 = ((j - 1) / 24) * TWO_PI;
-              const cp0 = cos(phi0); const sp0 = sin(phi0);
-              const x0 = e * ct * cp0; const z0 = e * ct * sp0; const y0 = e * st;
-              line(x0, z0, y0, x, z, y);
-            }
-            if (i > 0) {
-              const theta0 = ((i - 1) / steps) * halfPi;
-              const ct0 = cos(theta0); const st0 = sin(theta0);
-              const x0 = e * ct0 * cp; const z0 = e * ct0 * sp; const y0 = e * st0;
-              line(x0, z0, y0, x, z, y);
-            }
+      if (a.murmurShowInstrumentation) {
+        if (MURMUR_TWEEN_MODE === 1) {
+          const blend = a.murmurTweenBlend != null ? a.murmurTweenBlend : 0;
+          const from = a.murmurTweenFrom || 'box';
+          const to = a.murmurTweenTo || 'sphere';
+          drawContainerShape(from, e, eY, 20 * (1 - blend));
+          drawContainerShape(to, e, eY, 20 * blend);
+          noStroke();
+        } else if (MURMUR_TWEEN_MODE === 2) {
+          const n = Math.max(0.5, a.murmurSuperquadN != null ? a.murmurSuperquadN : 2);
+          drawSuperquadWireframe(e, eY, n);
+        } else if (MURMUR_TWEEN_MODE === 3) {
+          const blend = a.murmurTweenBlend != null ? a.murmurTweenBlend : 0;
+          drawVertexMorphWireframe(e, eY, a.murmurTweenFrom || 'box', a.murmurTweenTo || 'sphere', blend);
+          noStroke();
+        } else {
+          drawContainerShape(containerShape, e, eY, 20);
+          noStroke();
+        }
+        const effectiveShape = (MURMUR_TWEEN_MODE === 1 || MURMUR_TWEEN_MODE === 3)
+          ? (a.murmurTweenBlend >= 1 ? a.murmurTweenTo : a.murmurTweenFrom) : containerShape;
+        if (a.murmurShowGrid && effectiveShape === 'box') {
+          const gridN = Math.max(4, Math.min(24, a.murmurGridSize || 12));
+          const step = (2 * e) / gridN;
+          stroke(220, 15, 45, 12);
+          strokeWeight(0.012);
+          noFill();
+          for (let i = 0; i <= gridN; i++) {
+            const x = -e + i * step;
+            line(x, -e, -e, x, -e, e);
+            line(x, e, -e, x, e, e);
+            line(-e, -e, x, e, -e, x);
+            line(-e, e, x, e, e, x);
           }
+          noStroke();
         }
-      }
-      noStroke();
-      if (a.murmurShowGrid && containerShape === 'box') {
-        const gridN = Math.max(4, Math.min(24, a.murmurGridSize || 12));
-        const step = (2 * e) / gridN;
-        stroke(220, 15, 45, 12);
-        strokeWeight(0.012);
-        noFill();
-        for (let i = 0; i <= gridN; i++) {
-          const x = -e + i * step;
-          line(x, -e, -e, x, -e, e);
-          line(x, e, -e, x, e, e);
-          line(-e, -e, x, e, -e, x);
-          line(-e, e, x, e, e, x);
-        }
-        noStroke();
       }
       const path = a.murmurLorenzPath || [];
-      if (path.length >= 2) {
+      if (a.murmurShowInstrumentation && path.length >= 2) {
         noFill();
         stroke(180, 60, 85, 28);
         strokeWeight(0.04);
