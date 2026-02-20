@@ -42,6 +42,11 @@ const MURMUR_SPLIT_SPREAD_THRESHOLD = 0.25;
 const MURMUR_FADE_COUNT_THRESHOLD = 8;
 const MURMUR_CONNECT_RADIUS = 0.45;
 const MURMUR_TORUS_MINOR = 0.4;
+const MURMUR_SPREAD_RADIUS = 0.35;
+const MURMUR_SPREAD_DETACH_RATIO = 0.65;
+const MURMUR_SPARK_MAX_CHILDREN = 4;
+const MURMUR_SPREAD_EVERY = 8;
+const MURMUR_SPARK_BOX_SIZE = 0.12;
 const PAN_SPEED = 0.5;
 
 const MURMUR_TWEEN_MODE = typeof window !== 'undefined' ? window.MURMUR_TWEEN_MODE : undefined;
@@ -197,7 +202,7 @@ function lightenRgb(r, g, b, t) {
 
 function defaultAttractorState() {
   return {
-    mode: 'lorenz',
+    mode: 'murmuration',
     speedMultiplier: 0.4,
     numParticles: 800,
     showLines: true,
@@ -240,6 +245,13 @@ function defaultAttractorState() {
     murmurSwarmCentroids: [],
     murmurSwarmCounts: [],
     murmurNumSwarms: 0,
+    murmurTwinkle: false,
+    murmurSpread: false,
+    murmurSpreadRate: 0.4,
+    murmurSparkDuration: 4,
+    murmurSparkLineDuration: 0.75,
+    murmurSparkColorHex: '#FFD93D',
+    murmurSwarmColorHex: '#6BCB77',
     murmurContainerShape: 'torus',
     murmurTweenFrom: 'box',
     murmurTweenTo: 'sphere',
@@ -317,6 +329,8 @@ function initAttractorParticles(a) {
         trail: [],
         sizeScale: 0.85 + random(0.3),
         phase: random(TWO_PI),
+        isSpark: false,
+        infectedByIndex: null,
       });
     }
     a.murmurBlob = { x: 5, y: 5, z: 5 };
@@ -918,6 +932,12 @@ function murmurContainBoidSuperquad(b, extent, extentY, n) {
 function murmurBoidStep(a) {
   const boids = a.murmurBoids;
   if (!boids.length) return;
+  const n = boids.length;
+  for (let i = 0; i < n; i++) {
+    const b = boids[i];
+    if (b.isSpark === undefined) b.isSpark = false;
+    if (b.infectedByIndex === undefined) b.infectedByIndex = null;
+  }
   let extent;
   if (a.murmurBoxBreathe !== false) {
     const speed = a.murmurBoxBreatheSpeed ?? 0.02;
@@ -971,6 +991,84 @@ function murmurBoidStep(a) {
     a.murmurSwarmIds = result.swarmIds;
     a.murmurSwarmCentroids = result.centroids;
     a.murmurSwarmCounts = result.counts;
+  }
+  if (a.murmurSpread) {
+    const durationSec = Math.max(0, a.murmurSparkDuration ?? 4);
+    const durationFrames = durationSec > 0 ? Math.round(durationSec * 60) : Infinity;
+    const lineDurationSec = Math.max(0.25, Math.min(2, a.murmurSparkLineDuration ?? 0.75));
+    const lineDurationFrames = Math.round(lineDurationSec * 60);
+    const detachDist2 = (extent * MURMUR_SPREAD_DETACH_RATIO) ** 2;
+    for (let i = 0; i < n; i++) {
+      const b = boids[i];
+      if (!b.isSpark) continue;
+      if (b.infectedByIndex != null) {
+        if (b.lineUntil != null && frameCount >= b.lineUntil) {
+          b.isSpark = false;
+          b.infectedByIndex = null;
+          b.sparkUntil = null;
+          b.lineUntil = null;
+          continue;
+        }
+        const other = boids[b.infectedByIndex];
+        const dx = b.x - other.x, dy = b.y - other.y, dz = b.z - other.z;
+        if (dx * dx + dy * dy + dz * dz > detachDist2) {
+          b.isSpark = false;
+          b.infectedByIndex = null;
+          b.sparkUntil = null;
+          b.lineUntil = null;
+        }
+        continue;
+      }
+      if (b.sparkUntil == null) b.sparkUntil = frameCount + durationFrames;
+      if (durationSec > 0 && frameCount >= b.sparkUntil) {
+        b.isSpark = false;
+        b.infectedByIndex = null;
+        b.sparkUntil = null;
+      }
+    }
+  }
+  if (a.murmurSpread && frameCount % MURMUR_SPREAD_EVERY === 0) {
+    const extentSpread = extent * MURMUR_SPREAD_RADIUS;
+    const rate = Math.max(0.05, Math.min(1, a.murmurSpreadRate ?? 0.4));
+    const durationSec = Math.max(0, a.murmurSparkDuration ?? 4);
+    const durationFrames = durationSec > 0 ? Math.round(durationSec * 60) : Infinity;
+    let sparkCount = 0;
+    const sparkIndices = [];
+    for (let i = 0; i < n; i++) {
+      if (boids[i].isSpark) { sparkCount++; sparkIndices.push(i); }
+    }
+    const childCount = (si) => {
+      let c = 0;
+      for (let j = 0; j < n; j++) if (boids[j].infectedByIndex === si) c++;
+      return c;
+    };
+    if (sparkCount === 0 && Math.random() < 0.15) {
+      const idx = Math.floor(Math.random() * n);
+      boids[idx].isSpark = true;
+      boids[idx].infectedByIndex = null;
+      boids[idx].sparkUntil = frameCount + durationFrames;
+    } else if (sparkCount > 0) {
+      const lineDurationSec = Math.max(0.25, Math.min(2, a.murmurSparkLineDuration ?? 0.75));
+      const lineDurationFrames = Math.round(lineDurationSec * 60);
+      for (const si of sparkIndices) {
+        if (childCount(si) >= MURMUR_SPARK_MAX_CHILDREN) continue;
+        if (Math.random() > rate) continue;
+        const bs = boids[si];
+        let bestJ = -1;
+        let bestD2 = extentSpread * extentSpread * 1.1;
+        for (let j = 0; j < n; j++) {
+          if (j === si || boids[j].isSpark) continue;
+          const dx = boids[j].x - bs.x, dy = boids[j].y - bs.y, dz = boids[j].z - bs.z;
+          const d2 = dx * dx + dy * dy + dz * dz;
+          if (d2 < bestD2) { bestD2 = d2; bestJ = j; }
+        }
+        if (bestJ >= 0) {
+          boids[bestJ].isSpark = true;
+          boids[bestJ].infectedByIndex = si;
+          boids[bestJ].lineUntil = frameCount + lineDurationFrames;
+        }
+      }
+    }
   }
   if (!a.murmurSwarmCentroids || !a.murmurSwarmCounts || a.murmurSwarmCentroids.length === 0) {
     const n = boids.length;
@@ -1144,9 +1242,9 @@ function createPanelForAttractor(a) {
       <div class="panel-section">
         <div class="panel-section-title">Attractor</div>
         <select id="${pre}type">
+          <option value="murmuration" ${a.mode === 'murmuration' ? 'selected' : ''}>Murmuration</option>
           <option value="lorenz" ${a.mode === 'lorenz' ? 'selected' : ''}>Lorenz</option>
           <option value="rossler" ${a.mode === 'rossler' ? 'selected' : ''}>Rössler</option>
-          <option value="murmuration" ${a.mode === 'murmuration' ? 'selected' : ''}>Murmuration</option>
         </select>
       </div>
       <div class="panel-section">
@@ -1178,9 +1276,16 @@ function createPanelForAttractor(a) {
         <div class="slider-row"><span class="value">phase <span id="${pre}convergencePhase">0</span></span></div>
         <div class="slider-row"><label for="${pre}lorenzWeight">Lorenz pull</label><input type="range" id="${pre}lorenzWeight" min="0" max="0.25" value="${a.murmurLorenzWeight ?? MURMUR_LORENZ_WEIGHT_DEFAULT}" step="0.01"><span class="value" id="${pre}lorenzWeightVal">${((a.murmurLorenzWeight ?? MURMUR_LORENZ_WEIGHT_DEFAULT) * 100).toFixed(0)}%</span></div>
         <div class="slider-row"><label for="${pre}baseColor">Color</label><input type="color" id="${pre}baseColor" value="${String(a.murmurBaseColorHex || '#00d4ff').replace(/^#/, '').slice(0, 6) || '00d4ff'}" style="width:36px;height:22px;padding:0;border:1px solid #333;cursor:pointer;"><input type="text" id="${pre}baseColorHex" value="${a.murmurBaseColorHex || '#00d4ff'}" placeholder="#00d4ff" class="value" style="width:72px;font-family:monospace;font-size:11px;background:#1a1a1e;color:#e0e0e0;border:1px solid #333;border-radius:4px;padding:4px 6px;"></div>
+        <div class="slider-row"><label for="${pre}sparkColor">Spark</label><input type="color" id="${pre}sparkColor" value="${String(a.murmurSparkColorHex || '#FFD93D').replace(/^#/, '').slice(0, 6) || 'FFD93D'}" style="width:36px;height:22px;padding:0;border:1px solid #333;cursor:pointer;"></div>
+        <div class="slider-row"><label for="${pre}swarmColor">Swarm tint</label><input type="color" id="${pre}swarmColor" value="${String(a.murmurSwarmColorHex || '#6BCB77').replace(/^#/, '').slice(0, 6) || '6BCB77'}" style="width:36px;height:22px;padding:0;border:1px solid #333;cursor:pointer;"></div>
       </div>
       <div class="panel-section murmuration-only">
         <div class="panel-section-title">Murmuration</div>
+        <label class="toggle-row"><input type="checkbox" id="${pre}murmurTwinkle" ${a.murmurTwinkle ? 'checked' : ''}><span>Twinkle</span></label>
+        <label class="toggle-row"><input type="checkbox" id="${pre}murmurSpread" ${a.murmurSpread ? 'checked' : ''}><span>Spread (sparks)</span></label>
+        <div class="slider-row"><label for="${pre}spreadRate">Spread rate</label><input type="range" id="${pre}spreadRate" min="0.05" max="1" value="${a.murmurSpreadRate ?? 0.4}" step="0.05"><span class="value" id="${pre}spreadRateVal">${((a.murmurSpreadRate ?? 0.4) * 100).toFixed(0)}%</span></div>
+        <div class="slider-row"><label for="${pre}sparkDuration">Spark duration (s)</label><input type="range" id="${pre}sparkDuration" min="0" max="15" value="${a.murmurSparkDuration ?? 4}" step="0.5"><span class="value" id="${pre}sparkDurationVal">${(a.murmurSparkDuration ?? 4) === 0 ? '∞' : (a.murmurSparkDuration ?? 4)}</span></div>
+        <div class="slider-row"><label for="${pre}lineDuration">Line (pulse) duration (s)</label><input type="range" id="${pre}lineDuration" min="0.5" max="1.5" value="${a.murmurSparkLineDuration ?? 0.75}" step="0.25"><span class="value" id="${pre}lineDurationVal">${(a.murmurSparkLineDuration ?? 0.75).toFixed(2)}</span></div>
         <label class="toggle-row"><input type="checkbox" id="${pre}birdShape" ${a.murmurBirdShape !== false ? 'checked' : ''}><span>Bird shape</span></label>
         <label class="toggle-row"><input type="checkbox" id="${pre}trails" ${a.murmurShowTrails !== false ? 'checked' : ''}><span>Trails</span></label>
         <label class="toggle-row"><input type="checkbox" id="${pre}grid" ${a.murmurShowGrid !== false ? 'checked' : ''}><span>Grid</span></label>
@@ -1361,6 +1466,37 @@ function bindPanelToAttractor(panelEl, a) {
     if (a.mode === 'murmuration') initAttractorParticles(a);
   });
 
+  get('murmurTwinkle')?.addEventListener('change', (e) => {
+    a.murmurTwinkle = e.target.checked;
+  });
+  get('murmurSpread')?.addEventListener('change', (e) => {
+    a.murmurSpread = e.target.checked;
+  });
+  get('spreadRate')?.addEventListener('input', (e) => {
+    const v = Number(e.target.value);
+    a.murmurSpreadRate = v;
+    get('spreadRateVal').textContent = (v * 100).toFixed(0) + '%';
+  });
+  get('sparkDuration')?.addEventListener('input', (e) => {
+    const v = Number(e.target.value);
+    a.murmurSparkDuration = v;
+    const valEl = get('sparkDurationVal');
+    if (valEl) valEl.textContent = v === 0 ? '∞' : String(v);
+  });
+  get('lineDuration')?.addEventListener('input', (e) => {
+    const v = Number(e.target.value);
+    a.murmurSparkLineDuration = v;
+    const valEl = get('lineDurationVal');
+    if (valEl) valEl.textContent = v.toFixed(2);
+  });
+  get('sparkColor')?.addEventListener('input', (e) => {
+    const hex = (e.target.value || '').trim();
+    a.murmurSparkColorHex = hex.startsWith('#') ? hex : '#' + hex;
+  });
+  get('swarmColor')?.addEventListener('input', (e) => {
+    const hex = (e.target.value || '').trim();
+    a.murmurSwarmColorHex = hex.startsWith('#') ? hex : '#' + hex;
+  });
   get('birdShape')?.addEventListener('change', (e) => {
     a.murmurBirdShape = e.target.checked;
   });
@@ -2095,6 +2231,8 @@ function draw() {
       push();
       colorMode(RGB, 255);
       const baseRgb = parseHexToRgb(a.murmurBaseColorHex || '#00d4ff');
+      const sparkRgb = parseHexToRgb(a.murmurSparkColorHex || '#FFD93D');
+      const swarmRgb = parseHexToRgb(a.murmurSwarmColorHex || '#6BCB77');
       if (a.murmurShowInstrumentation) {
         const breathe = 1 + MURMUR_BREATHE_AMOUNT * sin(frameCount * MURMUR_BREATHE_SPEED);
         const perception = Math.min(extent * 0.45, 6) * sqrt(breathe);
@@ -2191,6 +2329,43 @@ function draw() {
           noStroke();
         }
       }
+      if (a.murmurSpread) {
+        const boxHalf = MURMUR_SPARK_BOX_SIZE * 0.5;
+        noFill();
+        strokeWeight(0.018);
+        for (let i = 0; i < boids.length; i++) {
+          const b = boids[i];
+          if (b.infectedByIndex != null && b.infectedByIndex !== i) {
+            const other = boids[b.infectedByIndex];
+            stroke(swarmRgb.r, swarmRgb.g, swarmRgb.b, 140);
+            line(b.x, b.z, b.y, other.x, other.z, other.y);
+          }
+        }
+        noStroke();
+        for (let i = 0; i < boids.length; i++) {
+          const b = boids[i];
+          if (!b.isSpark) continue;
+          stroke(sparkRgb.r, sparkRgb.g, sparkRgb.b, 200);
+          strokeWeight(0.02);
+          noFill();
+          push();
+          translate(b.x, b.z, b.y);
+          line(-boxHalf, -boxHalf, -boxHalf, boxHalf, -boxHalf, -boxHalf);
+          line(boxHalf, -boxHalf, -boxHalf, boxHalf, boxHalf, -boxHalf);
+          line(boxHalf, boxHalf, -boxHalf, -boxHalf, boxHalf, -boxHalf);
+          line(-boxHalf, boxHalf, -boxHalf, -boxHalf, -boxHalf, -boxHalf);
+          line(-boxHalf, -boxHalf, boxHalf, boxHalf, -boxHalf, boxHalf);
+          line(boxHalf, -boxHalf, boxHalf, boxHalf, boxHalf, boxHalf);
+          line(boxHalf, boxHalf, boxHalf, -boxHalf, boxHalf, boxHalf);
+          line(-boxHalf, boxHalf, boxHalf, -boxHalf, -boxHalf, boxHalf);
+          line(-boxHalf, -boxHalf, -boxHalf, -boxHalf, -boxHalf, boxHalf);
+          line(boxHalf, -boxHalf, -boxHalf, boxHalf, -boxHalf, boxHalf);
+          line(boxHalf, boxHalf, -boxHalf, boxHalf, boxHalf, boxHalf);
+          line(-boxHalf, boxHalf, -boxHalf, -boxHalf, boxHalf, boxHalf);
+          pop();
+        }
+        noStroke();
+      }
       const maxSpeed = MURMUR_BOID_MAX_SPEED;
       let vcmX = 0, vcmY = 0, vcmZ = 0;
       for (const b of boids) {
@@ -2274,11 +2449,37 @@ function draw() {
       if (phaseEl) phaseEl.textContent = String(numSwarms);
       if (phaseVal) phaseVal.textContent = (frameCount * 0.01 % 1).toFixed(2);
       if (!usedMedia) {
+        const spreadR = a.murmurSpread ? extent * MURMUR_SPREAD_RADIUS : 0;
         for (let i = 0; i < boids.length; i++) {
           const b = boids[i];
-          const swarmId = swarmIds[i] ?? 0;
-          const brgb = lightenRgb(baseRgb.r, baseRgb.g, baseRgb.b, swarmId * 0.06);
-          fill(brgb.r, brgb.g, brgb.b, min(255, Math.round((a.baseOpacity || 80) * 2.55 * 1.2)));
+          let r, g, b_;
+          if (a.murmurSpread && b.isSpark) {
+            r = sparkRgb.r; g = sparkRgb.g; b_ = sparkRgb.b;
+          } else if (a.murmurSpread && spreadR > 0) {
+            let nearSpark = false;
+            for (let j = 0; j < boids.length; j++) {
+              if (!boids[j].isSpark) continue;
+              const dx = b.x - boids[j].x, dy = b.y - boids[j].y, dz = b.z - boids[j].z;
+              if (dx * dx + dy * dy + dz * dz < spreadR * spreadR) { nearSpark = true; break; }
+            }
+            if (nearSpark) {
+              r = swarmRgb.r; g = swarmRgb.g; b_ = swarmRgb.b;
+            } else {
+              const swarmId = swarmIds[i] ?? 0;
+              const brgb = lightenRgb(baseRgb.r, baseRgb.g, baseRgb.b, swarmId * 0.06);
+              r = brgb.r; g = brgb.g; b_ = brgb.b;
+            }
+          } else {
+            const swarmId = swarmIds[i] ?? 0;
+            const brgb = lightenRgb(baseRgb.r, baseRgb.g, baseRgb.b, swarmId * 0.06);
+            r = brgb.r; g = brgb.g; b_ = brgb.b;
+          }
+          let alpha = (a.baseOpacity || 80) * 2.55 * 1.2;
+          if (a.murmurTwinkle) {
+            const tw = 0.5 + 0.5 * sin(frameCount * 0.04 + (b.phase ?? 0));
+            alpha *= 0.5 + 0.5 * tw;
+          }
+          fill(r, g, b_, min(255, Math.round(alpha)));
           drawBoidArrow(b, true, showFluctuations);
         }
       }
