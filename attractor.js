@@ -47,7 +47,21 @@ const MURMUR_SPREAD_DETACH_RATIO = 0.65;
 const MURMUR_SPARK_MAX_CHILDREN = 4;
 const MURMUR_SPREAD_EVERY = 8;
 const MURMUR_SPARK_BOX_SIZE = 0.12;
+const MURMUR_CURVE_STRENGTH = 0.08;
+const MURMUR_CURVE_HEIGHT = 0.4;
 const PAN_SPEED = 0.5;
+
+function murmurDensityPdf(t, alpha, sigma) {
+  const x = Math.max(-4, Math.min(4, t));
+  if (alpha === 2 || alpha === 'gaussian') {
+    const s = Math.max(0.2, sigma || 1);
+    return Math.exp(-(x * x) / (2 * s * s));
+  }
+  if (alpha === 1 || alpha === 'cauchy') {
+    return 1 / (1 + x * x);
+  }
+  return Math.exp(-(x * x) / 2);
+}
 
 const MURMUR_TWEEN_MODE = typeof window !== 'undefined' ? window.MURMUR_TWEEN_MODE : undefined;
 const MURMUR_TWEEN_SHAPES = ['box', 'sphere', 'ellipsoid', 'cylinder', 'cone', 'torus', 'pyramid', 'dome', 'tetrahedron', 'dodecahedron', 'starTetrahedron', 'compound5', 'stellationDodec', 'rhombicHexecontahedron'];
@@ -252,6 +266,9 @@ function defaultAttractorState() {
     murmurSparkLineDuration: 0.75,
     murmurSparkColorHex: '#FFD93D',
     murmurSwarmColorHex: '#6BCB77',
+    murmurCurveWeight: 0,
+    murmurCurveAlpha: 2,
+    murmurCurveSigma: 0.6,
     murmurContainerShape: 'torus',
     murmurTweenFrom: 'box',
     murmurTweenTo: 'sphere',
@@ -1174,6 +1191,21 @@ function murmurBoidStep(a) {
       fz += (tz / dist) * pull;
     }
 
+    const curveWeight = Math.max(0, Math.min(1, a.murmurCurveWeight ?? 0));
+    if (curveWeight > 0) {
+      const t = Math.max(-1, Math.min(1, b.x / (extent || 1)));
+      const alpha = a.murmurCurveAlpha ?? 2;
+      const sigma = Math.max(0.2, a.murmurCurveSigma ?? 0.6);
+      const pdfVal = murmurDensityPdf(t, alpha, sigma);
+      const targetY = 0;
+      const targetZ = extent * MURMUR_CURVE_HEIGHT * pdfVal;
+      const dy = targetY - b.y;
+      const dz = targetZ - b.z;
+      const curveStrength = curveWeight * MURMUR_CURVE_STRENGTH;
+      fy += dy * curveStrength;
+      fz += dz * curveStrength;
+    }
+
     const bounceR = extent * MURMUR_BOUNCE_RADIUS;
     const centroids = a.murmurSwarmCentroids || [];
     for (let t = 0; t < centroids.length; t++) {
@@ -1286,6 +1318,13 @@ function createPanelForAttractor(a) {
         <div class="slider-row"><label for="${pre}spreadRate">Spread rate</label><input type="range" id="${pre}spreadRate" min="0.05" max="1" value="${a.murmurSpreadRate ?? 0.4}" step="0.05"><span class="value" id="${pre}spreadRateVal">${((a.murmurSpreadRate ?? 0.4) * 100).toFixed(0)}%</span></div>
         <div class="slider-row"><label for="${pre}sparkDuration">Spark duration (s)</label><input type="range" id="${pre}sparkDuration" min="0" max="15" value="${a.murmurSparkDuration ?? 4}" step="0.5"><span class="value" id="${pre}sparkDurationVal">${(a.murmurSparkDuration ?? 4) === 0 ? '∞' : (a.murmurSparkDuration ?? 4)}</span></div>
         <div class="slider-row"><label for="${pre}lineDuration">Line (pulse) duration (s)</label><input type="range" id="${pre}lineDuration" min="0.5" max="1.5" value="${a.murmurSparkLineDuration ?? 0.75}" step="0.25"><span class="value" id="${pre}lineDurationVal">${(a.murmurSparkLineDuration ?? 0.75).toFixed(2)}</span></div>
+        <div class="panel-section-title" style="margin-top:10px;">Density curve</div>
+        <div class="slider-row"><label for="${pre}curveWeight">Curve pull</label><input type="range" id="${pre}curveWeight" min="0" max="1" value="${a.murmurCurveWeight ?? 0}" step="0.05"><span class="value" id="${pre}curveWeightVal">${((a.murmurCurveWeight ?? 0) * 100).toFixed(0)}%</span></div>
+        <div class="slider-row"><label for="${pre}curveAlpha">Curve type</label><select id="${pre}curveAlpha">
+          <option value="2" ${(a.murmurCurveAlpha ?? 2) === 2 ? 'selected' : ''}>Gaussian</option>
+          <option value="1" ${(a.murmurCurveAlpha ?? 2) === 1 ? 'selected' : ''}>Cauchy</option>
+        </select></div>
+        <div class="slider-row"><label for="${pre}curveSigma">Sharpness (σ)</label><input type="range" id="${pre}curveSigma" min="0.2" max="1.5" value="${a.murmurCurveSigma ?? 0.6}" step="0.1"><span class="value" id="${pre}curveSigmaVal">${(a.murmurCurveSigma ?? 0.6).toFixed(1)}</span></div>
         <label class="toggle-row"><input type="checkbox" id="${pre}birdShape" ${a.murmurBirdShape !== false ? 'checked' : ''}><span>Bird shape</span></label>
         <label class="toggle-row"><input type="checkbox" id="${pre}trails" ${a.murmurShowTrails !== false ? 'checked' : ''}><span>Trails</span></label>
         <label class="toggle-row"><input type="checkbox" id="${pre}grid" ${a.murmurShowGrid !== false ? 'checked' : ''}><span>Grid</span></label>
@@ -1488,6 +1527,19 @@ function bindPanelToAttractor(panelEl, a) {
     a.murmurSparkLineDuration = v;
     const valEl = get('lineDurationVal');
     if (valEl) valEl.textContent = v.toFixed(2);
+  });
+  get('curveWeight')?.addEventListener('input', (e) => {
+    const v = Number(e.target.value);
+    a.murmurCurveWeight = v;
+    get('curveWeightVal').textContent = (v * 100).toFixed(0) + '%';
+  });
+  get('curveAlpha')?.addEventListener('change', (e) => {
+    a.murmurCurveAlpha = Number(e.target.value);
+  });
+  get('curveSigma')?.addEventListener('input', (e) => {
+    const v = Number(e.target.value);
+    a.murmurCurveSigma = v;
+    get('curveSigmaVal').textContent = v.toFixed(1);
   });
   get('sparkColor')?.addEventListener('input', (e) => {
     const hex = (e.target.value || '').trim();
@@ -2195,6 +2247,22 @@ function draw() {
           noStroke();
         } else {
           drawContainerShape(containerShape, e, eY, 20);
+          noStroke();
+        }
+        if ((a.murmurCurveWeight ?? 0) > 0) {
+          const alpha = a.murmurCurveAlpha ?? 2;
+          const sigma = Math.max(0.2, a.murmurCurveSigma ?? 0.6);
+          const nCurve = 50;
+          noFill();
+          stroke(60, 80, 95, 90);
+          strokeWeight(0.03);
+          for (let i = 0; i < nCurve; i++) {
+            const t0 = -1 + (2 * i) / (nCurve - 1);
+            const t1 = -1 + (2 * (i + 1)) / (nCurve - 1);
+            const x0 = e * t0, z0 = e * MURMUR_CURVE_HEIGHT * murmurDensityPdf(t0, alpha, sigma);
+            const x1 = e * t1, z1 = e * MURMUR_CURVE_HEIGHT * murmurDensityPdf(t1, alpha, sigma);
+            line(x0, z0, 0, x1, z1, 0);
+          }
           noStroke();
         }
         const effectiveShape = (MURMUR_TWEEN_MODE === 1 || MURMUR_TWEEN_MODE === 3)
