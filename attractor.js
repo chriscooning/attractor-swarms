@@ -23,7 +23,7 @@ const MURMUR_COHESION_RADIUS = 0.25;
 const MURMUR_ALIGNMENT_W = 0.95;
 const MURMUR_SEPARATION_W = 1.5;
 const MURMUR_SEPARATION_RADIUS = 0.18;
-const MURMUR_NOISE_STRENGTH = 0.018;
+const MURMUR_NOISE_STRENGTH = 0.007;
 const MURMUR_LORENZ_WEIGHT_DEFAULT = 0.11;
 const MURMUR_LORENZ_PATH_POINTS = 80;
 const MURMUR_LORENZ_FILL = 1.05;
@@ -243,6 +243,8 @@ function defaultAttractorState() {
     murmurBlobWeight: 0.25,
     murmurBlob: { x: 5, y: 5, z: 5 },
     murmurShowFluctuations: true,
+    murmurFluctuationNoise: 0.007,
+    murmurFluctuationArrowScale: 1.8,
     murmurLorenzPath: [],
     murmurLorenzPhase: { x: 5, y: 5, z: 5 },
     murmurLorenzWeight: 0,
@@ -1221,9 +1223,10 @@ function murmurBoidStep(a) {
       }
     }
 
-    fx += random(-1, 1) * MURMUR_NOISE_STRENGTH;
-    fy += random(-1, 1) * MURMUR_NOISE_STRENGTH;
-    fz += random(-1, 1) * MURMUR_NOISE_STRENGTH;
+    const noiseStr = a.murmurFluctuationNoise ?? MURMUR_NOISE_STRENGTH;
+    fx += random(-1, 1) * noiseStr;
+    fy += random(-1, 1) * noiseStr;
+    fz += random(-1, 1) * noiseStr;
 
     const fmag = sqrt(fx * fx + fy * fy + fz * fz) || 1;
     const scaleF = min(1, maxForce / fmag);
@@ -1330,6 +1333,8 @@ function createPanelForAttractor(a) {
         <label class="toggle-row"><input type="checkbox" id="${pre}grid" ${a.murmurShowGrid !== false ? 'checked' : ''}><span>Grid</span></label>
         <label class="toggle-row"><input type="checkbox" id="${pre}instrumentation" ${a.murmurShowInstrumentation ? 'checked' : ''}><span>Show instrumentation</span></label>
         <div class="slider-row"><label for="${pre}fluctuations">Vectors</label><input type="checkbox" id="${pre}fluctuations" ${a.murmurShowFluctuations ? 'checked' : ''}><span class="value">Fluctuations (B)</span></div>
+        <div class="slider-row"><label for="${pre}fluctuationNoise">Fluctuation noise</label><input type="range" id="${pre}fluctuationNoise" min="0" max="0.04" value="${a.murmurFluctuationNoise ?? 0.007}" step="0.001"><span class="value" id="${pre}fluctuationNoiseVal">${((a.murmurFluctuationNoise ?? 0.007) * 1000).toFixed(2)}</span></div>
+        <div class="slider-row"><label for="${pre}fluctuationArrowScale">Vector scale</label><input type="range" id="${pre}fluctuationArrowScale" min="0.3" max="6" value="${a.murmurFluctuationArrowScale ?? 1.8}" step="0.1"><span class="value" id="${pre}fluctuationArrowScaleVal">${(a.murmurFluctuationArrowScale ?? 1.8).toFixed(1)}</span></div>
         <div class="slider-row container-shape-row${MURMUR_TWEEN_MODE ? ' hidden-when-tween' : ''}"><label for="${pre}containerShape">Container</label><select id="${pre}containerShape">
           <option value="box" ${(a.murmurContainerShape || 'box') === 'box' ? 'selected' : ''}>Box</option>
           <option value="sphere" ${(a.murmurContainerShape || '') === 'sphere' ? 'selected' : ''}>Sphere</option>
@@ -1563,6 +1568,18 @@ function bindPanelToAttractor(panelEl, a) {
   });
   get('fluctuations')?.addEventListener('change', (e) => {
     a.murmurShowFluctuations = e.target.checked;
+  });
+  get('fluctuationNoise')?.addEventListener('input', (e) => {
+    const v = Number(e.target.value);
+    a.murmurFluctuationNoise = v;
+    const valEl = get('fluctuationNoiseVal');
+    if (valEl) valEl.textContent = (v * 1000).toFixed(2);
+  });
+  get('fluctuationArrowScale')?.addEventListener('input', (e) => {
+    const v = Number(e.target.value);
+    a.murmurFluctuationArrowScale = v;
+    const valEl = get('fluctuationArrowScaleVal');
+    if (valEl) valEl.textContent = v.toFixed(1);
   });
 
   get('gridSize')?.addEventListener('input', (e) => {
@@ -2459,7 +2476,7 @@ function draw() {
         rotateX(pitch);
         let lenScale;
         if (showFluctuations) {
-          const fluctuationBoost = 5;
+          const fluctuationBoost = a.murmurFluctuationArrowScale ?? 1.8;
           lenScale = 0.3 + 1.2 * min(vmag / (maxSpeed * 0.15), 1) * fluctuationBoost;
         } else {
           lenScale = 0.5 + 0.8 * min((sqrt(b.vx * b.vx + b.vy * b.vy + b.vz * b.vz) || 0) / maxSpeed, 1.5);
