@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoL Glyph Morph</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #0a0a0f; min-height: 100vh; overflow: hidden; font-family: system-ui, sans-serif; }
+    main { display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .top-nav {
+      position: fixed; top: 12px; right: 12px; z-index: 20;
+      display: flex; gap: 12px; font-size: 12px;
+    }
+    .top-nav a { color: #5a6578; text-decoration: none; }
+    .top-nav a:hover { color: #8af; }
+  </style>
+</head>
+<body>
+  <nav class="top-nav">
+    <a href="index.html">Sketch</a>
+    <a href="attractor.html">Attractor</a>
+    <a href="tween3.html">Tween</a>
+    <a href="attractor2.html">Flock</a>
+    <a href="graph.html">Graph</a>
+    <a href="dither.html">Dither</a>
+    <a href="gol.html">GoL</a>
+  </nav>
+  <main></main>
+  <script src="gol.js"></script>
+</body>
+</html>
