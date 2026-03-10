@@ -13,6 +13,8 @@ const CONFIG = {
   ruleset: 'life',
   briansBrain: false,
   mouseInfluence: false,
+  videoThreshold: 120,
+  videoInvert: false,
 };
 
 const SCENES = {
@@ -23,7 +25,9 @@ const SCENES = {
   'moiré':                 { type: 'procedural', gen: 'moire' },
   'perlin':                { type: 'procedural', gen: 'perlin' },
   'heartbeat':             { type: 'procedural', gen: 'heartbeat' },
+  'bands':                 { type: 'procedural', gen: 'bands' },
   'conway':                { type: 'conway' },
+  'video':                 { type: 'video' },
 };
 
 let activeScene = SCENES[CONFIG.scene];
@@ -41,6 +45,8 @@ let currentIdx = 0;
 let frameInCycle = 0;
 let buf;
 let glowBuf;
+let videoEl = null;
+let videoBuf = null;
 
 const PROC_BIAS = 0.35;
 
@@ -89,6 +95,17 @@ const GENERATORS = {
     });
   },
 
+  bands(t) {
+    const speed = t * 0.15;
+    const bandWidth = 4;
+    const gapWidth = 22;
+    const cycle = bandWidth + gapWidth;
+    return makeGrid(cols, rows, (x, y) => {
+      const shifted = ((y + speed) % cycle + cycle) % cycle;
+      return shifted < bandWidth ? 1 : 0;
+    });
+  },
+
   heartbeat(t) {
     const cx = cols / 2, cy = rows / 2;
     const maxDist = Math.sqrt(cx * cx + cy * cy);
@@ -103,6 +120,32 @@ const GENERATORS = {
     });
   },
 };
+
+function sampleVideoTarget() {
+  if (!videoEl || videoEl.paused || videoEl.ended) {
+    return makeGrid(cols, rows);
+  }
+
+  if (!videoBuf) {
+    videoBuf = document.createElement('canvas');
+    videoBuf.width = cols;
+    videoBuf.height = rows;
+  }
+
+  const ctx = videoBuf.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(videoEl, 0, 0, cols, rows);
+  const imgData = ctx.getImageData(0, 0, cols, rows);
+  const px = imgData.data;
+  const thresh = CONFIG.videoThreshold;
+  const inv = CONFIG.videoInvert;
+
+  return makeGrid(cols, rows, (x, y) => {
+    const i = (y * cols + x) * 4;
+    const lum = px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114;
+    const on = lum > thresh;
+    return (inv ? !on : on) ? 1 : 0;
+  });
+}
 
 let conwayPopMin = 0;
 
@@ -134,7 +177,18 @@ function loadScene() {
     glyphGrids = [];
     grid = makeGrid(cols, rows, () => Math.random() < 0.35 ? 1 : 0);
     conwayPopMin = Math.floor(cols * rows * 0.01);
+  } else if (activeScene.type === 'video') {
+    activeGlyphs = null;
+    glyphGrids = [];
+    videoBuf = null;
+    grid = sampleVideoTarget();
+    if (!videoEl) {
+      document.getElementById('video-file').click();
+    }
   }
+
+  const ctrlDiv = document.getElementById('video-controls');
+  if (ctrlDiv) ctrlDiv.style.display = activeScene.type === 'video' ? 'block' : 'none';
 
   ages = makeGrid(cols, rows, (x, y) => grid[y][x] ? 1 : 0);
 }
@@ -182,6 +236,33 @@ function wirePanel() {
   const rulesel = document.getElementById('opt-ruleset');
   rulesel.value = CONFIG.ruleset;
   rulesel.addEventListener('change', () => { CONFIG.ruleset = rulesel.value; });
+
+  const threshSlider = document.getElementById('opt-videoThreshold');
+  threshSlider.value = CONFIG.videoThreshold;
+  threshSlider.addEventListener('input', () => { CONFIG.videoThreshold = parseInt(threshSlider.value); });
+
+  const invertCheck = document.getElementById('opt-videoInvert');
+  invertCheck.checked = CONFIG.videoInvert;
+  invertCheck.addEventListener('change', () => { CONFIG.videoInvert = invertCheck.checked; });
+
+  const fileInput = document.getElementById('video-file');
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (videoEl) {
+      videoEl.pause();
+      URL.revokeObjectURL(videoEl.src);
+    }
+
+    videoEl = document.createElement('video');
+    videoEl.src = URL.createObjectURL(file);
+    videoEl.loop = true;
+    videoEl.muted = true;
+    videoEl.playsInline = true;
+    videoBuf = null;
+    videoEl.play();
+  });
 }
 
 /* ── p5 lifecycle ── */
@@ -354,7 +435,10 @@ function draw() {
   let target;
   let bias;
 
-  if (activeScene.type === 'procedural') {
+  if (activeScene.type === 'video') {
+    target = sampleVideoTarget();
+    bias = PROC_BIAS;
+  } else if (activeScene.type === 'procedural') {
     target = GENERATORS[activeScene.gen](frameCount);
     bias = PROC_BIAS;
   } else if (activeScene.type === 'conway') {

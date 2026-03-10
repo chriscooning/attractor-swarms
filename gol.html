@@ -85,6 +85,18 @@
     <h3>Scene</h3>
     <div id="scene-radios"></div>
 
+    <div id="video-controls" style="display:none; margin-top:8px;">
+      <label style="flex-direction:column; align-items:flex-start; gap:4px;">
+        Threshold
+        <input type="range" id="opt-videoThreshold" min="20" max="230" value="120"
+               style="width:100%; accent-color:#8af; cursor:pointer;">
+      </label>
+      <label style="margin-top:4px;">
+        <input type="checkbox" id="opt-videoInvert"> Invert
+      </label>
+    </div>
+    <input type="file" id="video-file" accept="video/*" style="display:none;">
+
     <h3>Visuals</h3>
     <label><input type="checkbox" id="opt-colorAge"> Color by age</label>
     <label><input type="checkbox" id="opt-glow"> Glow / bloom</label>
