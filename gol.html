@@ -15,6 +15,57 @@
     }
     .top-nav a { color: #5a6578; text-decoration: none; }
     .top-nav a:hover { color: #8af; }
+
+    #panel-toggle {
+      position: fixed; top: 12px; left: 12px; z-index: 30;
+      background: none; border: none; color: #556; cursor: pointer;
+      font-size: 18px; line-height: 1; padding: 4px;
+      opacity: 0.4; transition: opacity 0.3s;
+    }
+    #panel-toggle:hover { opacity: 0.9; color: #8af; }
+
+    #ctrl-panel {
+      position: fixed; top: 0; left: 0; z-index: 25;
+      width: 220px; height: 100vh; overflow-y: auto;
+      background: rgba(10, 10, 18, 0.82);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      border-right: 1px solid rgba(255,255,255,0.06);
+      padding: 44px 16px 24px;
+      transform: translateX(-100%);
+      transition: transform 0.28s ease;
+      scrollbar-width: thin; scrollbar-color: #222 transparent;
+    }
+    #ctrl-panel.open { transform: translateX(0); }
+
+    #ctrl-panel h3 {
+      font-size: 9px; text-transform: uppercase; letter-spacing: 1.6px;
+      color: #556; margin: 18px 0 8px; padding-bottom: 4px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+    #ctrl-panel h3:first-child { margin-top: 0; }
+
+    #ctrl-panel label {
+      display: flex; align-items: center; gap: 7px;
+      font-size: 11px; color: #778; padding: 3px 0; cursor: pointer;
+      transition: color 0.2s;
+    }
+    #ctrl-panel label:hover { color: #abc; }
+
+    #ctrl-panel input[type="radio"],
+    #ctrl-panel input[type="checkbox"] {
+      accent-color: #8af; width: 13px; height: 13px; cursor: pointer;
+    }
+
+    #ctrl-panel select {
+      width: 100%; margin-top: 4px;
+      background: rgba(14, 14, 20, 0.9); color: #778;
+      border: 1px solid #222; border-radius: 4px;
+      padding: 4px 6px; font-size: 11px; font-family: system-ui, sans-serif;
+      cursor: pointer; transition: border-color 0.2s;
+    }
+    #ctrl-panel select:hover, #ctrl-panel select:focus {
+      border-color: #444; color: #abc; outline: none;
+    }
   </style>
 </head>
 <body>
@@ -27,6 +78,33 @@
     <a href="dither.html">Dither</a>
     <a href="gol.html">GoL</a>
   </nav>
+
+  <button id="panel-toggle" aria-label="Toggle controls">⚙</button>
+
+  <aside id="ctrl-panel">
+    <h3>Scene</h3>
+    <div id="scene-radios"></div>
+
+    <h3>Visuals</h3>
+    <label><input type="checkbox" id="opt-colorAge"> Color by age</label>
+    <label><input type="checkbox" id="opt-glow"> Glow / bloom</label>
+    <label><input type="checkbox" id="opt-trails"> Trails</label>
+    <label><input type="checkbox" id="opt-cellSize"> Cell size variation</label>
+    <label><input type="checkbox" id="opt-dotMode"> Dot mode</label>
+    <label><input type="checkbox" id="opt-scanline"> Scanline</label>
+
+    <h3>Engine</h3>
+    <label>Ruleset
+      <select id="opt-ruleset">
+        <option value="life">Life (B3/S23)</option>
+        <option value="highlife">Highlife (B36/S23)</option>
+        <option value="daynight">Day &amp; Night</option>
+      </select>
+    </label>
+    <label><input type="checkbox" id="opt-briansBrain"> Brian's Brain</label>
+    <label><input type="checkbox" id="opt-mouseInfluence"> Mouse influence</label>
+  </aside>
+
   <main></main>
   <script src="gol.js"></script>
 </body>
