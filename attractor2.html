@@ -7,7 +7,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #0c0c0e; min-height: 100vh; overflow: hidden; font-family: system-ui, sans-serif; }
+    body { background: #d8e4f0; min-height: 100vh; overflow: hidden; font-family: system-ui, sans-serif; }
     main { position: relative; }
 
     #attractor-ui {
@@ -60,21 +60,28 @@
       transition: opacity 1s ease;
     }
     #hint.hint-faded { opacity: 0; pointer-events: none; }
+    .title-bar {
+      position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+      z-index: 15; font-size: 14px; font-weight: 600; color: #4a5568;
+      letter-spacing: 0.04em; pointer-events: none;
+    }
     .top-nav { position: fixed; top: 12px; right: 12px; z-index: 20; display: flex; gap: 12px; font-size: 12px; }
-    .top-nav a { color: #888; text-decoration: none; }
-    .top-nav a:hover { color: #6b8ab0; }
+    .top-nav a { color: #5a6578; text-decoration: none; }
+    .top-nav a:hover { color: #2c5282; }
   </style>
 </head>
 <body>
+  <div class="title-bar">Flockin with Boids</div>
   <nav class="top-nav">
     <a href="index.html">Sketch</a>
     <a href="attractor.html">Attractor</a>
     <a href="tween3.html">Tween</a>
     <a href="attractor2.html">Flock</a>
+    <a href="graph.html">Graph</a>
   </nav>
   <main></main>
-  <div id="attractor-ui"></div>
-  <div id="hint">Flock · X toggles UI · H pan</div>
+  <div id="attractor-ui" class="hidden"></div>
+  <div id="hint" class="hint-faded">Flock · X toggles UI · H pan</div>
   <script src="attractor2.js"></script>
 </body>
 </html>
