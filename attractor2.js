@@ -20,7 +20,7 @@ function defaultFlockState() {
     noiseStrength: 0.1,
     extent: 12,
     showVectors: false,
-    showWireframe: true,
+    showWireframe: false,
     boids: []
   };
 }
@@ -52,10 +52,33 @@ function initFlockBoids(a) {
     const mag = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1;
     boids.push({
       x, y, z,
-      vx: vx / mag, vy: vy / mag, vz: vz / mag
+      vx: vx / mag, vy: vy / mag, vz: vz / mag,
+      phase: Math.random() * 100
     });
   }
   a.boids = boids;
+}
+
+// Bird silhouette (teardrop + wings); forward = +Y local, like TSL/example
+function drawFlockBird(b, lenScale) {
+  const bodyLen = 0.12 * lenScale;
+  const wingSpan = 0.06 * lenScale;
+  const flutter = 0.92 + 0.16 * Math.sin(frameCount * 0.2 + (b.phase ?? 0));
+  push();
+  scale(flutter);
+  noStroke();
+  fill(255, 255, 255, 220);
+  beginShape(TRIANGLES);
+  vertex(0, bodyLen, 0);
+  vertex(-bodyLen * 0.4, -bodyLen * 0.6, 0);
+  vertex(bodyLen * 0.4, -bodyLen * 0.6, 0);
+  endShape(CLOSE);
+  strokeWeight(0.008);
+  stroke(60, 70, 90, 120);
+  line(0, 0, 0, -wingSpan * 0.9, wingSpan * 0.2, wingSpan * 0.25);
+  line(0, 0, 0, wingSpan * 0.9, wingSpan * 0.2, wingSpan * 0.25);
+  noStroke();
+  pop();
 }
 
 function containBoidBox(b, extent) {
@@ -369,7 +392,10 @@ function setup() {
 }
 
 function draw() {
-  background(0, 0, 6);
+  // Light sky – like TSL Flocks example
+  colorMode(RGB, 255);
+  background(220, 232, 248);
+  colorMode(HSB, 360, 100, 100, 100);
 
   const camX = centerX + zoomDistance * cos(orbitPhi) * sin(orbitTheta);
   const camY = centerY + zoomDistance * sin(orbitPhi);
@@ -382,17 +408,16 @@ function draw() {
   const extent = Math.max(1, a.extent ?? 12);
   const boids = a.boids;
   const showVectors = !!a.showVectors;
-  const showWireframe = a.showWireframe !== false;
+  const showWireframe = !!a.showWireframe;
 
   if (showWireframe) {
     drawBoxWireframe(extent);
   }
 
-  fill(200, 70, 85, 90);
+  colorMode(RGB, 255);
   noStroke();
-  const coneRad = 0.08;
-  const coneH = 0.2;
   const vectorLen = 0.4;
+  const lenScale = 1.2;
 
   for (let i = 0; i < boids.length; i++) {
     const b = boids[i];
@@ -406,11 +431,11 @@ function draw() {
     translate(b.x, b.z, b.y);
     rotateY(yaw);
     rotateX(pitch);
-    cone(coneRad, coneH);
+    drawFlockBird(b, lenScale);
     if (showVectors) {
-      stroke(200, 50, 90, 60);
+      stroke(60, 70, 90, 80);
       strokeWeight(0.02);
-      line(0, 0, 0, 0, 0, vectorLen);
+      line(0, 0, 0, 0, vectorLen, 0);
       noStroke();
     }
     pop();

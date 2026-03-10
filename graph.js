@@ -252,6 +252,27 @@ function hardDotTexture(hex) {
   return tex;
 }
 
+function tendrilDotTexture(hex) {
+  const key = 'tend_' + hex;
+  if (texCache.has(key)) return texCache.get(key);
+  const res = 16, cx = res / 2, cy = res / 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = res;
+  const ctx = canvas.getContext('2d');
+  const [R, G, B] = _rgb(hex);
+
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, res / 2);
+  g.addColorStop(0, `rgba(${R},${G},${B}, 0.95)`);
+  g.addColorStop(0.4, `rgba(${R},${G},${B}, 0.35)`);
+  g.addColorStop(1, `rgba(${R},${G},${B}, 0)`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, res, res);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  texCache.set(key, tex);
+  return tex;
+}
+
 /* ── graph ──────────────────────────────────────────────────── */
 
 const el = document.getElementById('graph');
@@ -311,8 +332,50 @@ const graph = ForceGraph3D()(el)
     const sprite = new THREE.Sprite(mat);
     const s = Math.cbrt(node.size) * 7;
     sprite.scale.set(s, s, 1);
-    sprite.__baseScale = s;
-    return sprite;
+
+    if (node.type === 'transient') {
+      sprite.__baseScale = s;
+      return sprite;
+    }
+
+    const group = new THREE.Group();
+    group.add(sprite);
+
+    const TENDRIL_N = 5;
+    const tendrilR = s * 1.1;
+    const tTex = tendrilDotTexture(node.color);
+    const tendrils = [];
+
+    for (let ti = 0; ti < TENDRIL_N; ti++) {
+      const theta = 2 * Math.PI * ti / PHI;
+      const phi = Math.acos(1 - 2 * (ti + 0.5) / TENDRIL_N);
+      const tMat = new THREE.SpriteMaterial({
+        map: tTex,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        opacity: 0,
+      });
+      const tSprite = new THREE.Sprite(tMat);
+      const tSize = s * 0.2;
+      tSprite.scale.set(tSize, tSize, 1);
+      group.add(tSprite);
+
+      tendrils.push({
+        sprite: tSprite,
+        mat: tMat,
+        dx: Math.sin(phi) * Math.cos(theta),
+        dy: Math.sin(phi) * Math.sin(theta),
+        dz: Math.cos(phi),
+        targetR: tendrilR * (0.85 + Math.random() * 0.3),
+        delay: ti * 0.08 + Math.random() * 0.15,
+      });
+    }
+
+    node.__tendrils = tendrils;
+    node.__mainMat = mat;
+    node.__baseScale = s;
+    return group;
   })
   .nodeThreeObjectExtend(false)
   .linkThreeObject(() => {
@@ -408,8 +471,12 @@ function computeDepths() {
   return depth;
 }
 
+let cachedDepths = new Map();
+let depthStale = true;
+
 function radialForce(alpha) {
-  const depth = computeDepths();
+  if (depthStale) { cachedDepths = computeDepths(); depthStale = false; }
+  const depth = cachedDepths;
   for (const n of nodes) {
     const d = depth.get(n.id) || 3;
     const targetR = d * RING_SPACING;
@@ -430,11 +497,11 @@ graph.scene().fog = fog;
 
 /* ── membrane faces ────────────────────────────────────────── */
 
-const FACE_CAP = 300;
+const FACE_CAP = 80;
 const faceMat = new THREE.MeshBasicMaterial({
   color: new THREE.Color(palette.edge),
   transparent: true,
-  opacity: 0.04,
+  opacity: 0.018,
   side: THREE.DoubleSide,
   depthWrite: false,
   blending: THREE.AdditiveBlending,
@@ -617,7 +684,7 @@ graph.scene().add(pulseGroup);
 let pulseTimer = 0;
 function maybePulse() {
   pulseTimer++;
-  if (pulseTimer % 3 === 0) emitPulse();
+  if (pulseTimer % 8 === 0) emitPulse();
 }
 
 /* ── crawl waves ───────────────────────────────────────────── */
@@ -667,6 +734,7 @@ setTimeout(fireWave, 6000);
 
 function refresh() {
   cap();
+  depthStale = true;
   for (const n of nodes) {
     if (n.type === 'system' || n.type === 'folder') n._deg = degree(n.id);
   }
@@ -704,6 +772,7 @@ window.addEventListener('wheel', e => {
 /* ── camera ─────────────────────────────────────────────────── */
 
 const epoch = Date.now();
+let frameIdx = 0;
 
 (function tick() {
   requestAnimationFrame(tick);
@@ -721,9 +790,10 @@ const epoch = Date.now();
   cam.position.set(r * Math.cos(a), ey, r * Math.sin(a));
   cam.lookAt(0, 0, 0);
 
-  updateFacePositions();
+  if (frameIdx % 3 === 0) updateFacePositions();
   maybePulse();
-  updatePulses();
+  if (frameIdx % 2 === 0) updatePulses();
+  frameIdx++;
 
   const now = Date.now();
   for (const n of nodes) {
@@ -759,14 +829,40 @@ const epoch = Date.now();
     }
 
     const obj = n.__threeObj;
-    if (obj && obj.material && !n.__ringMat) {
-      if (wi > 0.01) {
-        obj.material.opacity = 0.85 + wi * 0.15;
-        const boost = 1 + wi * 0.4;
-        obj.scale.set(obj.__baseScale * boost, obj.__baseScale * boost, 1);
-      } else {
-        obj.material.opacity = 0.85;
-        if (obj.__baseScale) obj.scale.set(obj.__baseScale, obj.__baseScale, 1);
+    if (obj && !n.__ringMat) {
+      if (n.__mainMat) {
+        n.__mainMat.opacity = 0.85 + (wi > 0.01 ? wi * 0.15 : 0);
+      } else if (obj.material) {
+        if (wi > 0.01) {
+          obj.material.opacity = 0.85 + wi * 0.15;
+          const boost = 1 + wi * 0.4;
+          obj.scale.set(obj.__baseScale * boost, obj.__baseScale * boost, 1);
+        } else {
+          obj.material.opacity = 0.85;
+          if (obj.__baseScale) obj.scale.set(obj.__baseScale, obj.__baseScale, 1);
+        }
+      }
+
+      if (n.__tendrils) {
+        const age = (now - (n.born || 0)) / 1000;
+        const bs = n.__baseScale;
+        for (const td of n.__tendrils) {
+          const tAge = Math.max(0, age - td.delay);
+          const growT = Math.min(tAge / 1.8, 1);
+          const eased = growT * growT * (3 - 2 * growT);
+
+          const breath = eased > 0.8
+            ? Math.sin(now * 0.0015 + td.dx * 5) * 0.12 * eased
+            : 0;
+          const r = td.targetR * (eased + breath);
+
+          td.sprite.position.set(td.dx * r, td.dy * r, td.dz * r);
+          td.mat.opacity = eased * 0.55 + wi * 0.25 * eased;
+
+          const pulse = 1 + Math.sin(now * 0.002 + td.dy * 4) * 0.2 * eased;
+          const dotSize = bs * 0.2 * pulse;
+          td.sprite.scale.set(dotSize, dotSize, 1);
+        }
       }
     }
   }
