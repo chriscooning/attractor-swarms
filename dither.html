@@ -3,20 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Attractor2 — Flock (TSL-style boids)</title>
+  <title>Dithering — Visual Experiments</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #d8e4f0; min-height: 100vh; overflow: hidden; font-family: system-ui, sans-serif; }
+    body { background: #0c0c0e; min-height: 100vh; overflow: hidden; font-family: system-ui, sans-serif; }
     main { position: relative; }
 
-    #attractor-ui {
+    #dither-ui {
       position: fixed; top: 16px; left: 16px; z-index: 10;
       display: flex; flex-direction: column; gap: 8px;
       max-height: calc(100vh - 32px); overflow-y: auto;
       width: 220px;
     }
-    #attractor-ui.hidden { display: none; }
+    #dither-ui.hidden { display: none; }
 
     .attractor-panel {
       flex-shrink: 0;
@@ -27,7 +27,7 @@
     }
     .attractor-panel .panel-header {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 12px; cursor: pointer; user-select: none;
+      padding: 10px 12px; cursor: default; user-select: none;
       border-bottom: 1px solid #252528;
     }
     .attractor-panel .panel-header .title { font-size: 11px; font-weight: 600; color: #aaa; }
@@ -39,6 +39,11 @@
       color: #666; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid #252528;
     }
     .panel-body label { display: flex; align-items: center; gap: 6px; }
+    .panel-body select {
+      width: 100%; background: #1a1a1e; color: #e0e0e0; border: 1px solid #333;
+      padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;
+    }
+    .panel-body select:hover { border-color: #555; }
     .slider-row {
       display: flex; align-items: center; gap: 8px; margin-top: 6px;
     }
@@ -67,11 +72,11 @@
     }
     .top-nav { position: fixed; top: 12px; right: 12px; z-index: 20; display: flex; gap: 12px; font-size: 12px; }
     .top-nav a { color: #5a6578; text-decoration: none; }
-    .top-nav a:hover { color: #2c5282; }
+    .top-nav a:hover { color: #7a9aba; }
   </style>
 </head>
 <body>
-  <div class="title-bar">Flockin with Boids</div>
+  <div class="title-bar">Dithering</div>
   <nav class="top-nav">
     <a href="index.html">Sketch</a>
     <a href="attractor.html">Attractor</a>
@@ -81,8 +86,8 @@
     <a href="dither.html">Dither</a>
   </nav>
   <main></main>
-  <div id="attractor-ui" class="hidden"></div>
-  <div id="hint" class="hint-faded">Flock · X toggles UI · H pan</div>
-  <script src="attractor2.js"></script>
+  <div id="dither-ui"></div>
+  <div id="hint">← → modes · click draw · space pause · R randomize · C clear · X ui</div>
+  <script src="dither.js"></script>
 </body>
 </html>
